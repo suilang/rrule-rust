@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <title>hello-wasm example</title>
+    <!-- <script src="https://unpkg.com/dayjs@1.8.21/dayjs.min.js"></script>
+    <script src="https://unpkg.com/dayjs@1.8.21/path/to/dayjs/plugin/Timezone"></script> -->
+    <!-- Load plugin as window.dayjs_plugin_NAME -->
+    <!-- <script>
+      dayjs.extend(window.dayjs_plugin_advancedFormat);
+    </script> -->
+  </head>
+  <body>
+    <script type="module">
+      import init, { JsRRule, JsRRuleSet } from './pkg/sl_rrule_rust.js';
+      init().then(() => {
+        console.time('time');
+        // const rrule = new JsRRule(
+        //   'FREQ=WEEKLY;WKST=SU;UNTIL=20231103T180000Z;INTERVAL=1;BYDAY=TU'
+        // );
+
+        const set = new JsRRuleSet('DTSTART:20231001T180000Z\nRRULE:FREQ=WEEKLY;COUNT=3');
+        set.tz('America/New_York')
+        console.log(
+          '==>',
+          set
+            .all(10)
+            .split(',')
+            .map((str) => new Date(Number(str)))
+        );
+        console.timeEnd('time');
+      });
+    </script>
+  </body>
+</html>
