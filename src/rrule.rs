@@ -8,6 +8,7 @@ mod frequency;
 pub use frequency::Frequency;
 pub mod weekday;
 
+
 #[derive(Debug)]
 pub enum RRuleProperty {
     Freq(Frequency),
@@ -18,7 +19,7 @@ pub enum RRuleProperty {
     ByMinute,
     ByHour,
     ByDay(Vec<NWeekday>),
-    ByMonthDay,
+    ByMonthDay(Vec<i16>),
     ByYearDay,
     ByWeekNo,
     ByMonth,
@@ -45,7 +46,9 @@ impl FromStr for RRuleProperty {
             "BYMINUTE" => Self::ByMinute,
             "BYHOUR" => Self::ByHour,
             "BYWEEKDAY" | "BYDAY" => Self::ByDay(parse_weekdays(value).unwrap()),
-            "BYMONTHDAY" => Self::ByMonthDay,
+            "BYMONTHDAY" => {
+                Self::ByMonthDay(value.split(",").map(|s| s.parse().unwrap_or(0)).collect())
+            }
             "BYYEARDAY" => Self::ByYearDay,
             "BYWEEKNO" => Self::ByWeekNo,
             "BYMONTH" => Self::ByMonth,
@@ -64,6 +67,7 @@ pub struct RRule {
     pub by_day: Option<Vec<NWeekday>>,
     pub interval: u32,
     pub week_start: Weekday,
+    pub by_month_day: Vec<i16>,
 }
 impl RRule {
     pub fn default() -> RRule {
@@ -74,6 +78,7 @@ impl RRule {
             until: None,
             interval: 1,
             week_start: Weekday::Sun,
+            by_month_day: vec![],
         }
     }
     // 解析字符串，RRULE:FREQ=DAILY;COUNT=3。单行，不处理dt_start
@@ -84,7 +89,7 @@ impl RRule {
         let mut by_day = None;
         let mut interval = 1;
         let mut week_start = Weekday::Sun;
-
+        let mut by_month_day: Vec<i16> = vec![];
         let lines: Vec<&str> = rrule_str.split(':').collect();
         let parts: Vec<&str> = if lines.len() == 2 {
             lines[1].split(";").collect()
@@ -115,6 +120,9 @@ impl RRule {
                     RRuleProperty::Wkst(day) => {
                         week_start = day;
                     }
+                    RRuleProperty::ByMonthDay(vec) => {
+                        by_month_day = vec;
+                    }
                     // 其他RRule的参数，可以在这里处理
                     _ => {}
                 }
@@ -127,6 +135,7 @@ impl RRule {
             by_day,
             interval,
             week_start,
+            by_month_day,
         }
     }
 }
