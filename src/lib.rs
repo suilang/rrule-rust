@@ -1,8 +1,10 @@
+mod point_time;
+mod rrule;
+mod rrule_set;
+use rrule::RRule;
+use rrule_set::RRuleSet;
 
-pub mod parse_date_string;
-pub mod rrule;
 use wasm_bindgen::prelude::wasm_bindgen;
-use crate::rrule::{RRule, RRuleSet};
 #[wasm_bindgen]
 pub struct JsRRule {
     rrule: RRule,
@@ -39,9 +41,13 @@ impl JsRRuleSet {
         self.rrule_set.tz(tz);
     }
 
-    pub fn all(&self, limit: u32) -> String {
+    pub fn set_dt_start(&mut self, str: &str){
+        self.rrule_set.set_dt_start(str)
+    }
+
+    pub fn all(&self) -> String {
         self.rrule_set
-            .all(limit)
+            .all()
             .iter()
             .map(|d| d.timestamp_millis().to_string())
             .collect::<Vec<_>>()

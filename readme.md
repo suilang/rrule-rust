@@ -1,0 +1,9 @@
+1. daily
+   1. 支持interval
+   2. 不按byday
+2. week
+   1. byday不支持+4TU类型
+   2. 支持interval
+   3. 支持count和until只设置一个，如有until则不使用count
+   4. 支持wkst
+3. month

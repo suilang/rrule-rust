@@ -19,8 +19,8 @@
         //   'FREQ=WEEKLY;WKST=SU;UNTIL=20231103T180000Z;INTERVAL=1;BYDAY=TU'
         // );
 
-        const set = new JsRRuleSet('DTSTART:20231001T180000Z\nRRULE:FREQ=WEEKLY;COUNT=3');
-        set.tz('America/New_York')
+        const set = new JsRRuleSet('DTSTART:20220506T180000Z\nRRULE:FREQ=WEEKLY;WKST=SU;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR;UNTIL=20231121T235959');
+        set.tz('Asia/Shanghai')
         console.log(
           '==>',
           set
