@@ -24,9 +24,9 @@
         console.log(
           '==>',
           set
-            .all(10)
+            .all()
             .split(',')
-            .map((str) => new Date(Number(str)))
+            .map((str) => new Date(Number(str)).toISOString())
         );
         console.timeEnd('time');
       });

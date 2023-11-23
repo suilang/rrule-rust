@@ -1,13 +1,15 @@
 use crate::point_time::PointTime;
 use crate::rrule::weekday::NWeekday;
 use crate::rrule::{get_tz_from_str, parse_dt_strart_str, RRule};
-use chrono::{naive, DateTime, Datelike, Duration, NaiveDate, TimeZone, Weekday};
+use chrono::{DateTime, Datelike, Duration, NaiveDate, TimeZone, Weekday};
 use chrono_tz::Tz;
+
+const MAX_UNTIL_STR: &str = "20300101T000000Z";
+#[derive(Debug)]
 pub struct RRuleSet {
     rrule: Vec<RRule>,
     tz: Tz,
     start_point_time: Option<PointTime>,
-    limit: u32,
 }
 
 impl RRuleSet {
@@ -22,7 +24,6 @@ impl RRuleSet {
                 rrule: vec![rrule],
                 start_point_time: Some(start_point_time),
                 tz: Tz::UTC,
-                limit: 0,
             });
         }
         let rrule = RRule::from_str(lines[0]);
@@ -30,7 +31,6 @@ impl RRuleSet {
             rrule: vec![rrule],
             tz: Tz::UTC,
             start_point_time: None,
-            limit: 0,
         })
     }
     pub fn add_rrule(&mut self, rrule: &str) {
@@ -48,6 +48,13 @@ impl RRuleSet {
         self.tz = get_tz_from_str(tz)
     }
 
+    pub fn set_count(&mut self, count: u32) {
+        if self.rrule.len() == 0 {
+            return;
+        }
+        self.rrule.get_mut(0).unwrap().set_count(count);
+    }
+
     pub fn all(&self) -> Vec<DateTime<Tz>> {
         if self.start_point_time.is_none() {
             return Vec::new();
@@ -60,12 +67,12 @@ impl RRuleSet {
         let rrule = self.rrule.get(0).unwrap();
 
         // 如果没设置长度和截止时间，直接返回[]
-        if self.limit == 0 && rrule.until.is_none() {
+        if rrule.count == 0 && rrule.until.is_none() {
             return Vec::new();
         }
 
         // 如果长度为0，并且开始时间大于截止时间，直接返回[]
-        if self.limit == 0 {
+        if rrule.count == 0 {
             let start_point_time = self.start_point_time.as_ref().unwrap();
             let end_point_time = rrule.until.as_ref().unwrap();
             if start_point_time > end_point_time {
@@ -103,14 +110,22 @@ impl RRuleSet {
     fn expand_by_week(&self) -> Result<Vec<PointTime>, String> {
         let point_time = self.start_point_time.as_ref().unwrap();
         let rrule = self.rrule.get(0).unwrap();
-        let limit = self.limit;        
+        let max = if rrule.count == 0 {
+            65535
+        } else {
+            rrule.count as usize
+        };
         let interval = rrule.interval;
 
         let curr =
             NaiveDate::from_ymd_opt(point_time.year, point_time.month, point_time.day).unwrap();
 
-        let binding = vec![NWeekday::Every(curr.weekday())];
-        let by_day = rrule.by_day.as_deref().unwrap_or(&binding);
+        let binding = &vec![NWeekday::Every(curr.weekday())];
+        let by_day = if rrule.by_day.len() == 0 {
+            binding
+        } else {
+            &rrule.by_day
+        };
 
         let generate_point_time = |d: &NaiveDate| PointTime {
             year: d.year(),
@@ -119,33 +134,25 @@ impl RRuleSet {
             hour: point_time.hour,
             min: point_time.min,
             sec: point_time.sec,
-        }; 
+        };
 
         let mut next = curr.clone();
         let mut dates: Vec<PointTime> = Vec::new();
         let by_weekdays: Vec<Weekday> = by_day.iter().map(|n| n.get_weekday().clone()).collect();
+        let end_time = rrule.until.as_ref().map_or_else(
+            || NaiveDate::MAX,
+            |until| NaiveDate::from_ymd_opt(until.year, until.month, until.day).unwrap(),
+        );
 
-        match &rrule.until {
-            Some(until) => {
-                let end_time = NaiveDate::from_ymd_opt(until.year, until.month, until.day).unwrap();
-                while next <= end_time {
-                    let weekday = next.weekday();
-                    println!("--->{}", next);
-                    if by_weekdays.contains(&weekday) {
-                        dates.push(generate_point_time(&next));
-                    }
-                    if weekday == rrule.week_start && interval != 1 {
-                        next = next + Duration::weeks((interval - 1).into())
-                    } else {
-                        next = next + Duration::days(1);
-                    }
-                }
+        while next <= end_time && dates.len() < max {
+            let weekday = next.weekday();
+            if by_weekdays.contains(&weekday) {
+                dates.push(generate_point_time(&next));
             }
-            None => {
-                for _ in 0..limit {
-                    dates.push(generate_point_time(&next));
-                    next = next + Duration::weeks(interval.into());
-                }
+            if weekday == rrule.week_start.pred() && interval != 1 {
+                next = next + Duration::weeks((interval - 1).into()) + Duration::days(1);
+            } else {
+                next = next + Duration::days(1);
             }
         }
 
@@ -156,7 +163,7 @@ impl RRuleSet {
         let point_time = self.start_point_time.as_ref().unwrap();
 
         let rrule = self.rrule.get(0).unwrap();
-        let limit = self.limit;
+        let limit = rrule.count;
         let interval = rrule.interval;
         let curr = Tz::UTC
             .with_ymd_and_hms(point_time.year, point_time.month, point_time.day, 12, 0, 0)
@@ -195,25 +202,28 @@ impl RRuleSet {
     }
 
     /// 按月扩展，无效则报错
-    /// - 先判断是否有bymonthday，有则直接用
+    /// - 先判断是否有bymonthday，有则直接用，并且确认是否在byday中
     /// - 然后看有没有byday，迭代byday，如果是普通weekday，则取1..5来获取对应周数的时间，有则push到dates中，指定周数的日期，则指定处理
     /// 如果没有byday，则只需从开始时间起，按月累加即可，直到大于截止时间或者超出limit限制。
 
     fn expand_by_month(&self) -> Result<Vec<PointTime>, String> {
         let point_time = self.start_point_time.as_ref().unwrap();
         let rrule = self.rrule.get(0).unwrap();
-        let limit = self.limit;
+        let limit = rrule.count;
         let interval = rrule.interval;
-        let until = rrule.until.clone();
+        let end_time = if let Some(until) = &rrule.until {
+            until.clone()
+        } else {
+            MAX_UNTIL_STR.parse::<PointTime>().unwrap()
+        };
         let max = if limit == 0 { 65535 } else { limit as usize };
 
         let naive_dt_start =
             NaiveDate::from_ymd_opt(point_time.year, point_time.month, point_time.day).unwrap();
-        let naive_end_time = until
-            .clone()
-            .and_then(|until| NaiveDate::from_ymd_opt(until.year, until.month, until.day));
+        let naive_end_time =
+            NaiveDate::from_ymd_opt(end_time.year, end_time.month, end_time.day).unwrap();
 
-        if rrule.by_month_day.len() == 0 || rrule.by_day.is_none() {
+        if rrule.by_month_day.len() == 0 && rrule.by_day.len() == 0 {
             let mut dates: Vec<PointTime> = Vec::new();
             let mut next = point_time.clone();
 
@@ -234,6 +244,10 @@ impl RRuleSet {
             return Ok(dates);
         }
 
+        // 闭包，判断加入的值是否符合条件
+        // 1. vec没有超长
+        // 2. 时间在指定区间内
+        // 3. 如果有byday，则需匹配
         let add_to_dates = |naive: &NaiveDate, vec: &mut Vec<PointTime>| {
             if vec.len() > max {
                 return;
@@ -241,9 +255,10 @@ impl RRuleSet {
             if naive < &naive_dt_start {
                 return;
             }
-            if naive_end_time.is_some() && naive > &naive_end_time.unwrap() {
+            if naive > &naive_end_time {
                 return;
             }
+
             vec.push(PointTime {
                 year: naive.year(),
                 month: naive.month(),
@@ -255,85 +270,113 @@ impl RRuleSet {
         };
 
         let generate_dates_in_month = |curr_month: &PointTime, dates: &mut Vec<PointTime>| {
+            // todo 缓存下两个序列取出的值 做一下交集
             // 并不关心by_month_day是否有值，默认为vec[]
-            rrule.by_month_day.iter().for_each(|n| {
-                if *n > 0 {
-                    let naive =
-                        NaiveDate::from_ymd_opt(curr_month.year, curr_month.month, *n as u32);
-                    if let Some(naive) = naive {
-                        add_to_dates(&naive, dates);
+            let vec_by_monthday = rrule
+                .by_month_day
+                .iter()
+                .map(|n| {
+                    if *n > 0 {
+                        let naive =
+                            NaiveDate::from_ymd_opt(curr_month.year, curr_month.month, *n as u32);
+                        return naive;
                     }
-                    return;
-                }
-                let last = Self::get_last_day_of_month(curr_month.year, curr_month.month);
-                let last_day = last.day();
-                if last_day as i16 + n + 1 > 0 {
-                    let curr = last.with_day((last_day as i16 + n + 1) as u32).unwrap();
-                    add_to_dates(&curr, dates);
-                }
-            });
-
-            if let Some(by_day) = rrule.by_day.as_ref() {
-                by_day.iter().for_each(|n_weekday| match n_weekday {
-                    NWeekday::Every(weekday) => {
-                        for i in 1..5 {
-                            let naive_date = NaiveDate::from_weekday_of_month_opt(
-                                curr_month.year,
-                                curr_month.month,
-                                *weekday,
-                                i,
-                            );
-                            if let Some(naive) = naive_date {
-                                add_to_dates(&naive, dates);
-                            }
-                        }
+                    let last = Self::get_last_day_of_month(curr_month.year, curr_month.month);
+                    let last_day = last.day();
+                    if last_day as i16 + n + 1 > 0 {
+                        let curr = last.with_day((last_day as i16 + n + 1) as u32);
+                        return curr;
                     }
-                    NWeekday::Nth(n, weekday) => {
-                        if *n > 0 {
-                            let naive_date = NaiveDate::from_weekday_of_month_opt(
-                                curr_month.year,
-                                curr_month.month,
-                                *weekday,
-                                *n as u8,
-                            );
-                            if let Some(naive) = naive_date {
-                                add_to_dates(&naive, dates);
-                            }
-                            return;
-                        }
-                        let first_day_of_month =
-                            NaiveDate::from_ymd_opt(curr_month.year, curr_month.month, 1).unwrap();
-                        let last_day_of_month =
-                            Self::get_last_day_of_month(curr_month.year, curr_month.month);
-                        let mut date = last_day_of_month;
-                        // 找到最后一个周三
-                        while date.weekday() != Weekday::Wed {
-                            date = date.succ_opt().unwrap();
-                        }
-
-                        let diff = *n + 1;
-                        date = date + Duration::weeks(diff as i64);
-                        if date >= first_day_of_month {
-                            add_to_dates(&date, dates)
-                        }
-                    }
+                    return None;
                 })
+                .filter(|n| n.is_some())
+                .map(|n| n.unwrap())
+                .collect::<Vec<NaiveDate>>();
+
+            let vec_by_day = rrule
+                .by_day
+                .iter()
+                .map(|n_weekday| {
+                    let mut vec: Vec<NaiveDate> = vec![];
+                    match n_weekday {
+                        NWeekday::Every(weekday) => {
+                            for i in 1..5 {
+                                let naive_date = NaiveDate::from_weekday_of_month_opt(
+                                    curr_month.year,
+                                    curr_month.month,
+                                    *weekday,
+                                    i,
+                                );
+                                if let Some(naive) = naive_date {
+                                    vec.push(naive);
+                                }
+                            }
+                        }
+                        NWeekday::Nth(n, weekday) => {
+                            if *n > 0 {
+                                let naive_date = NaiveDate::from_weekday_of_month_opt(
+                                    curr_month.year,
+                                    curr_month.month,
+                                    *weekday,
+                                    *n as u8,
+                                );
+                                if let Some(naive) = naive_date {
+                                    vec.push(naive);
+                                }
+                            } else {
+                                // 下面处理 n < 0 的场景
+                                let first_day_of_month =
+                                    NaiveDate::from_ymd_opt(curr_month.year, curr_month.month, 1)
+                                        .unwrap();
+                                let last_day_of_month =
+                                    Self::get_last_day_of_month(curr_month.year, curr_month.month);
+                                let mut date = last_day_of_month;
+
+                                // 找到最后一个weekday
+                                while date.weekday() != *weekday {
+                                    date = date.pred_opt().unwrap();
+                                }
+
+                                let diff = *n + 1;
+                                date = date + Duration::weeks(diff as i64);
+                                if date >= first_day_of_month {
+                                    vec.push(date);
+                                }
+                            }
+                        }
+                    }
+                    return vec;
+                })
+                .flatten()
+                .collect::<Vec<NaiveDate>>();
+
+            if rrule.by_day.len() == 0 {
+                vec_by_monthday.iter().for_each(|n| add_to_dates(&n, dates));
+                return;
             }
+            if rrule.by_month_day.len() == 0 {
+                vec_by_day.iter().for_each(|n| add_to_dates(&n, dates));
+                return;
+            }
+
+            let new_vec: Vec<NaiveDate> = vec_by_day
+                .clone()
+                .into_iter()
+                .filter(|n| vec_by_monthday.contains(&n))
+                .collect();
+            new_vec.iter().for_each(|n| add_to_dates(&n, dates));
         };
 
         let mut curr_month = point_time.clone();
         let mut dates: Vec<PointTime> = vec![];
-        while dates.len() < max
-            && if until.is_none() {
-                true
-            } else {
-                until.as_ref().unwrap() >= &curr_month
-            }
-        {
+
+        while dates.len() < max && curr_month < end_time {
             generate_dates_in_month(&curr_month, &mut dates);
             curr_month = curr_month.add_month(interval);
         }
-
+        let len = if dates.len() < max { dates.len() } else { max };
+        dates = dates[0..len].to_vec();
+        dates.sort();
         Ok(dates)
     }
 
@@ -369,10 +412,10 @@ mod test {
             start_point_time: Some(point_time),
             rrule: vec![RRule {
                 freq: Frequency::Daily,
+                count: 10,
                 ..RRule::default()
             }],
             tz: Tz::UTC,
-            limit: 10,
         };
         let dates = set.expand_by_day().unwrap();
         assert_eq!(dates.len(), 10);
@@ -391,10 +434,10 @@ mod test {
             rrule: vec![RRule {
                 freq: Frequency::Daily,
                 interval: 2,
+                count: 5,
                 ..RRule::default()
             }],
             tz: Tz::UTC,
-            limit: 5,
         };
         let dates = set.expand_by_day().unwrap();
         assert_eq!(dates.len(), 5);
@@ -425,22 +468,17 @@ mod test {
 
     #[test]
     fn test_expand_by_week() {
-        let point_time = "20231023T180000Z".parse().unwrap();
-        let set = RRuleSet {
-            start_point_time: Some(point_time),
-            rrule: vec![RRule {
-                by_day: Some(vec![NWeekday::Every(Weekday::Tue)]),
-                ..RRule::default()
-            }],
-            tz: Tz::UTC,
-            limit: 10,
-        };
-        let dates = set.expand_by_week().unwrap();
-        assert_eq!(dates.len(), 10);
-        let first = dates.get(0).unwrap();
-        assert_eq!(first, &"20231024T180000Z".parse().unwrap());
-        let last = dates.get(9).unwrap();
-        assert_eq!(last, &"20231226T180000Z".parse().unwrap())
+        let test_vec = vec![
+            (
+                "DTSTART:20231123T180000Z\nRRULE:FREQ=WEEKLY;COUNT=3;WKST=MO;",
+                vec!["20231123T180000", "20231130T180000", "20231207T180000"],
+            ),
+            (
+                "DTSTART:20231123T180000Z\nRRULE:FREQ=WEEKLY;COUNT=3;WKST=MO;BYDAY=WE",
+                vec!["20231129T180000", "20231206T180000", "20231213T180000"],
+            ),
+        ];
+        run_test_by_vec(test_vec);
     }
 
     #[test]
@@ -448,9 +486,8 @@ mod test {
         let point_time = "20231023T180000Z".parse().unwrap();
         let set = RRuleSet {
             start_point_time: Some(point_time),
-            rrule: vec![RRule::from_str("Freq=WEEKLY;BYDAY=TU;INTERVAL=2")],
+            rrule: vec![RRule::from_str("FREQ=WEEKLY;BYDAY=TU;INTERVAL=2;COUNT=2")],
             tz: Tz::UTC,
-            limit: 2,
         };
         let dates = set.expand_by_week().unwrap();
         assert_eq!(dates.len(), 2);
@@ -461,17 +498,46 @@ mod test {
     }
 
     #[test]
+    fn test_expand_by_month() {
+        let test_vec = vec![
+            (
+                "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;",
+                vec!["20231029T091800", "20231129T091800", "20231229T091800"],
+            ),
+            (
+                "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;INTERVAL=2",
+                vec!["20231029T091800", "20231229T091800", "20240229T091800"],
+            ),
+            (
+                "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYMONTHDAY=1,3",
+                vec!["20231101T091800", "20231103T091800", "20231201T091800"],
+            ),
+            (
+                "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYMONTHDAY=1,3;BYDAY=FR",
+                vec!["20231103T091800", "20231201T091800", "20240301T091800"],
+            ),
+            (
+                "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYMONTHDAY=1;BYDAY=1FR",
+                vec!["20231201T091800", "20240301T091800", "20241101T091800"],
+            ),
+            (
+                "DTSTART:20231123T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYMONTHDAY=1;BYDAY=1FR;INTERVAL=2",
+                vec!["20240301T091800", "20241101T091800", "20260501T091800"],
+            ),
+            (
+                "DTSTART:20231123T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYDAY=2FR;",
+                vec!["20231208T091800", "20240112T091800", "20240209T091800"],
+            ),
+        ];
+        run_test_by_vec(test_vec);
+    }
+    #[test]
     fn test_rruleset() {
         let mut rrule_set = RRuleSet::from_str("RRULE:FREQ=WEEKLY;COUNT=3").unwrap();
         rrule_set.set_dt_start("20231001T180000");
         rrule_set.tz("America/New_York");
-        rrule_set.limit = 10;
         let dates = rrule_set.all();
-        assert_eq!(dates.len(), 10);
-        println!(
-            "{:?}",
-            dates.iter().map(|d| d.to_string()).collect::<Vec<_>>()
-        );
+        assert_eq!(dates.len(), 3);
     }
 
     #[test]
@@ -481,5 +547,16 @@ mod test {
         assert_eq!(dates.get(0).unwrap().to_string(), "2022-05-06 18:00:00 UTC");
         assert_eq!(dates.get(1).unwrap().to_string(), "2022-05-09 18:00:00 UTC");
         assert_eq!(dates.last().unwrap().to_string(), "2023-11-21 18:00:00 UTC");
+    }
+
+    fn run_test_by_vec(test_vec: Vec<(&str, Vec<&str>)>) {
+        test_vec.iter().for_each(|(str, vec)| {
+            assert_eq!(
+                RRuleSet::from_str(str).unwrap().all(),
+                vec.iter()
+                    .map(|time| time.parse::<PointTime>().unwrap().with_timezone(&Tz::UTC))
+                    .collect::<Vec<_>>()
+            )
+        });
     }
 }

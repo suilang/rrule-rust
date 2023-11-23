@@ -4,7 +4,7 @@ mod rrule_set;
 use rrule::RRule;
 use rrule_set::RRuleSet;
 
-use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 pub struct JsRRule {
     rrule: RRule,
@@ -17,6 +17,10 @@ impl JsRRule {
         JsRRule {
             rrule: RRule::from_str(s),
         }
+    }
+
+    pub fn set_count(&mut self, count: u32){
+        self.rrule.count = count;
     }
 }
 
@@ -43,6 +47,10 @@ impl JsRRuleSet {
 
     pub fn set_dt_start(&mut self, str: &str){
         self.rrule_set.set_dt_start(str)
+    }
+
+    pub fn set_count(&mut self, count: u32){
+        self.rrule_set.set_count(count);
     }
 
     pub fn all(&self) -> String {

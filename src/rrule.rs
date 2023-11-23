@@ -64,7 +64,7 @@ pub struct RRule {
     pub freq: Frequency,
     pub until: Option<PointTime>,
     pub count: u32,
-    pub by_day: Option<Vec<NWeekday>>,
+    pub by_day: Vec<NWeekday>,
     pub interval: u32,
     pub week_start: Weekday,
     pub by_month_day: Vec<i16>,
@@ -74,7 +74,7 @@ impl RRule {
         RRule {
             freq: Frequency::Weekly,
             count: 0,
-            by_day: None,
+            by_day: vec![],
             until: None,
             interval: 1,
             week_start: Weekday::Sun,
@@ -86,7 +86,7 @@ impl RRule {
         let mut freq: Frequency = Frequency::Weekly;
         let mut count: u32 = 0;
         let mut until: Option<PointTime> = None;
-        let mut by_day = None;
+        let mut by_day = vec![];
         let mut interval = 1;
         let mut week_start = Weekday::Sun;
         let mut by_month_day: Vec<i16> = vec![];
@@ -112,7 +112,7 @@ impl RRule {
                         until = Some(p);
                     }
                     RRuleProperty::ByDay(days) => {
-                        by_day = Some(days);
+                        by_day = days;
                     }
                     RRuleProperty::Interval(number) => {
                         interval = number;
@@ -137,6 +137,10 @@ impl RRule {
             week_start,
             by_month_day,
         }
+    }
+
+    pub fn set_count(&mut self, count: u32){
+        self.count = count;
     }
 }
 

@@ -1,9 +1,9 @@
-use chrono::{DateTime, LocalResult, NaiveDate, TimeZone};
+use chrono::{DateTime, NaiveDate, TimeZone};
 use chrono_tz::Tz;
 use std::cmp::Ordering;
 use std::str::FromStr;
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Eq)]
 pub struct PointTime {
     pub year: i32,
     pub month: u32,
@@ -55,25 +55,56 @@ impl FromStr for PointTime {
 
 impl PartialOrd for PointTime {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.year > other.year {
-            return Some(Ordering::Greater);
+        if self.year != other.year {
+            return Some(if self.year > other.year {
+                Ordering::Greater
+            } else {
+                Ordering::Less
+            });
         }
-        if self.month > other.month {
-            return Some(Ordering::Greater);
+        if self.month != other.month {
+            return Some(if self.month > other.month {
+                Ordering::Greater
+            } else {
+                Ordering::Less
+            });
         }
-        if self.day > other.day {
-            return Some(Ordering::Greater);
+        if self.day != other.day {
+            return Some(if self.day > other.day {
+                Ordering::Greater
+            } else {
+                Ordering::Less
+            });
         }
-        if self.hour > other.hour {
-            return Some(Ordering::Greater);
+        if self.hour != other.hour {
+            return Some(if self.hour > other.hour {
+                Ordering::Greater
+            } else {
+                Ordering::Less
+            });
         }
-        if self.min > other.min {
-            return Some(Ordering::Greater);
+        if self.min != other.min {
+            return Some(if self.min > other.min {
+                Ordering::Greater
+            } else {
+                Ordering::Less
+            });
         }
-        if self.sec > other.sec {
-            return Some(Ordering::Greater);
+        if self.sec != other.sec {
+            return Some(if self.sec > other.sec {
+                Ordering::Greater
+            } else {
+                Ordering::Less
+            });
         }
+
         return Some(Ordering::Equal);
+    }
+}
+
+impl Ord for PointTime {
+    fn cmp(&self, other: &Self) -> Ordering {
+        return self.partial_cmp(other).unwrap();
     }
 }
 
@@ -90,26 +121,27 @@ impl PointTime {
 
     pub fn add_month(&mut self, mon: u32) -> Self {
         let mut next_point_time = self.clone();
-        let add = |curr: &mut PointTime| {
-            curr.month = curr.month + mon;
-            if curr.month > 12 {
-                curr.month -= 12;
-                curr.year += 1;
-            };
-        };
-        add(&mut next_point_time);
 
-        while !next_point_time.is_valid() {
-            add(&mut next_point_time)
+        loop {
+            next_point_time.month = next_point_time.month + mon;
+            if next_point_time.month > 12 {
+                next_point_time.month -= 12;
+                next_point_time.year += 1;
+            };
+
+            if next_point_time.is_valid() {
+                break;
+            }
         }
         next_point_time
     }
 
+    /// 判断时间节点是否有效
     pub fn is_valid(&self) -> bool {
         let date_time = NaiveDate::from_ymd_opt(self.year, self.month, self.day);
         match date_time {
-            Some(_) => false,
-            _ => true,
+            Some(_) => true,
+            _ => false,
         }
     }
 }
@@ -128,13 +160,21 @@ mod test {
 
     #[test]
     fn test_add_month() {
-        let mut time1: PointTime = "20231031T180000Z".parse().unwrap();
+        assert_eq!(
+            "20231031T180000Z"
+                .parse::<PointTime>()
+                .unwrap()
+                .add_month(1),
+            "20231231T180000Z".parse().unwrap()
+        );
 
-        let time2 = time1.add_month(1);
-        assert_eq!(time2, "20231231T180000Z".parse().unwrap());
-
-        let time3 = time1.add_month(2);
-        assert_eq!(time3, "20231231T180000Z".parse().unwrap());
+        assert_eq!(
+            "20231031T180000Z"
+                .parse::<PointTime>()
+                .unwrap()
+                .add_month(2),
+            "20231231T180000Z".parse().unwrap()
+        );
 
         assert_eq!(
             "20231031T180000Z"
@@ -142,6 +182,38 @@ mod test {
                 .unwrap()
                 .add_month(3),
             "20240131T180000Z".parse().unwrap()
-        )
+        );
+
+        assert_eq!(
+            "20231029T180000Z"
+                .parse::<PointTime>()
+                .unwrap()
+                .add_month(1),
+            "20231129T180000Z".parse().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_Ord() {
+        assert_eq!(
+            "20231115T191020".parse::<PointTime>().unwrap()
+                < "20231116T191020".parse::<PointTime>().unwrap(),
+            true
+        );
+        assert_eq!(
+            "20231116T191020".parse::<PointTime>().unwrap()
+                > "20231115T191020".parse::<PointTime>().unwrap(),
+            true
+        );
+        assert_eq!(
+            "20231116T191020".parse::<PointTime>().unwrap()
+                == "20231116T191020".parse::<PointTime>().unwrap(),
+            true
+        );
+        assert_eq!(
+            "20231029T191020".parse::<PointTime>().unwrap()
+                < "23000101T000000".parse::<PointTime>().unwrap(),
+            true
+        );
     }
 }

@@ -40,6 +40,18 @@ impl NWeekday {
             NWeekday::Nth(_, weekday) => weekday,
         }
     }
+
+    pub fn weekday_to_str(d: Weekday) -> String {
+        match d {
+            Weekday::Mon => "MO".to_string(),
+            Weekday::Tue => "TU".to_string(),
+            Weekday::Wed => "WE".to_string(),
+            Weekday::Thu => "TH".to_string(),
+            Weekday::Fri => "FR".to_string(),
+            Weekday::Sat => "SA".to_string(),
+            Weekday::Sun => "SU".to_string(),
+        }
+    }
 }
 
 impl FromStr for NWeekday {
@@ -92,16 +104,4 @@ pub(crate) fn parse_weekdays(val: &str) -> Result<Vec<NWeekday>, String> {
         wdays.push(wday);
     }
     Ok(wdays)
-}
-
-fn weekday_to_str(d: Weekday) -> String {
-    match d {
-        Weekday::Mon => "MO".to_string(),
-        Weekday::Tue => "TU".to_string(),
-        Weekday::Wed => "WE".to_string(),
-        Weekday::Thu => "TH".to_string(),
-        Weekday::Fri => "FR".to_string(),
-        Weekday::Sat => "SA".to_string(),
-        Weekday::Sun => "SU".to_string(),
-    }
 }
