@@ -15,7 +15,7 @@ $ yarn add @sl/rrule-rust
 
 #### Usage
 
-**RRule:**
+**RRuleSet:**
 
 ```es6
 import init, { JsRRule, JsRRuleSet } from '@sl/rrule-rust';
@@ -39,39 +39,40 @@ init().then(() => {
  /* … */]
 ```
 
-At this stage, you must call the 'init' function before you can use the inner function.
+At this stage, you must call the `init` function before you can use the inner function. It is not supported to set the time zone directly in the string, you must use `set.tz` setting, the default is `UTC`.
+
+Due to a communication problem, the format returned is a timestamp concatenated string, separated by commas. Need to actively divide and parse.
 
 # test
 
 For daily, weekly, and monthly cycles, which are basically consistent with the resolution in rrule, the following single tests are currently verified in rust.
 
 ```rust
+(   "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;",
+    vec!["20231029T091800", "20231129T091800", "20231229T091800"],
+),
 (
-                "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;",
-                vec!["20231029T091800", "20231129T091800", "20231229T091800"],
-            ),
-            (
-                "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;INTERVAL=2",
-                vec!["20231029T091800", "20231229T091800", "20240229T091800"],
-            ),
-            (
-                "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYMONTHDAY=1,3",
-                vec!["20231101T091800", "20231103T091800", "20231201T091800"],
-            ),
-            (
-                "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYMONTHDAY=1,3;BYDAY=FR",
-                vec!["20231103T091800", "20231201T091800", "20240301T091800"],
-            ),
-            (
-                "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYMONTHDAY=1;BYDAY=1FR",
-                vec!["20231201T091800", "20240301T091800", "20241101T091800"],
-            ),
-            (
-                "DTSTART:20231123T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYMONTHDAY=1;BYDAY=1FR;INTERVAL=2",
-                vec!["20240301T091800", "20241101T091800", "20260501T091800"],
-            ),
-            (
-                "DTSTART:20231123T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYDAY=2FR;",
-                vec!["20231208T091800", "20240112T091800", "20240209T091800"],
-            ),
+    "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;INTERVAL=2",
+    vec!["20231029T091800", "20231229T091800", "20240229T091800"],
+),
+(
+    "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYMONTHDAY=1,3",
+    vec!["20231101T091800", "20231103T091800", "20231201T091800"],
+),
+(
+    "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYMONTHDAY=1,3;BYDAY=FR",
+    vec!["20231103T091800", "20231201T091800", "20240301T091800"],
+),
+(
+    "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYMONTHDAY=1;BYDAY=1FR",
+    vec!["20231201T091800", "20240301T091800", "20241101T091800"],
+),
+(
+    "DTSTART:20231123T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYMONTHDAY=1;BYDAY=1FR;INTERVAL=2",
+    vec!["20240301T091800", "20241101T091800", "20260501T091800"],
+),
+(
+    "DTSTART:20231123T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYDAY=2FR;",
+    vec!["20231208T091800", "20240112T091800", "20240209T091800"],
+),
 ```

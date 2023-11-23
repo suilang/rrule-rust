@@ -12,7 +12,7 @@ fs.readFile(filePath, 'utf8', (err, data) => {
   let jsonData = JSON.parse(data);
 
   // 修改变量的值
-  jsonData.name = '@sl/rrule-rust';
+  jsonData.name = '@suilang/rrule-rust';
 
   // 将修改后的内容写回文件
   fs.writeFile(filePath, JSON.stringify(jsonData, null, 2), 'utf8', (err) => {
