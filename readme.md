@@ -4,6 +4,7 @@
 
 
 This is a rrule project written in Rust, which is ultimately packaged as WebAssembly for use. The current version of this project does not strictly adhere to the iCalendar RFC. For example, certain properties may not take effect when the recurring dimension is monthly, weekly, or daily. Additionally, the project has not yet implemented the year recurrence feature.
+
 ---
 
 #### Client Side
