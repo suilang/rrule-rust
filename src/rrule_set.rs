@@ -1,10 +1,10 @@
 use std::ops::Range;
 
 use crate::point_time::PointTime;
-use crate::rrule::weekday::NWeekday;
+use crate::rrule::weekday::{self, NWeekday};
 use crate::rrule::{self, get_tz_from_str, parse_dt_strart_str, RRule};
 use chrono::{DateTime, Datelike, Duration, NaiveDate, TimeZone, Weekday};
-use chrono_tz::Tz;
+use chrono_tz::{Tz, WET};
 
 const MAX_UNTIL_STR: &str = "23000101T000000Z";
 #[derive(Debug)]
@@ -225,24 +225,15 @@ impl RRuleSet {
         let naive_end_time =
             NaiveDate::from_ymd_opt(end_time.year, end_time.month, end_time.day).unwrap();
 
-        if rrule.by_month_day.len() == 0 && rrule.by_day.len() == 0 {
+        if rrule.by_month_day.is_empty() && rrule.by_day.is_empty() {
             let mut dates: Vec<PointTime> = Vec::new();
-            let mut next = point_time.clone();
+            let mut next: PointTime = point_time.clone();
 
-            match &rrule.until {
-                Some(until) => {
-                    while &next <= until && dates.len() < max {
-                        dates.push(next.clone());
-                        next = next.add_month(interval);
-                    }
-                }
-                None => {
-                    for _ in 0..max {
-                        dates.push(next.clone());
-                        next = next.add_month(interval);
-                    }
-                }
-            };
+            while &next <= end_time && dates.len() < max {
+                dates.push(next.clone());
+                next = next.add_month(interval);
+            }
+
             return Ok(dates);
         }
 
@@ -277,20 +268,7 @@ impl RRuleSet {
             let vec_by_monthday = rrule
                 .by_month_day
                 .iter()
-                .map(|n| {
-                    if *n > 0 {
-                        let naive =
-                            NaiveDate::from_ymd_opt(curr_month.year, curr_month.month, *n as u32);
-                        return naive;
-                    }
-                    let last = Self::get_last_day_of_month(curr_month.year, curr_month.month);
-                    let last_day = last.day();
-                    if last_day as i16 + n + 1 > 0 {
-                        let curr = last.with_day((last_day as i16 + n + 1) as u32);
-                        return curr;
-                    }
-                    return None;
-                })
+                .map(|n| Self::get_nth_day_of_month(curr_month.year, curr_month.month, *n))
                 .filter(|n| n.is_some())
                 .map(|n| n.unwrap())
                 .collect::<Vec<NaiveDate>>();
@@ -299,55 +277,7 @@ impl RRuleSet {
                 .by_day
                 .iter()
                 .map(|n_weekday| {
-                    let mut vec: Vec<NaiveDate> = vec![];
-                    match n_weekday {
-                        NWeekday::Every(weekday) => {
-                            for i in 1..5 {
-                                let naive_date = NaiveDate::from_weekday_of_month_opt(
-                                    curr_month.year,
-                                    curr_month.month,
-                                    *weekday,
-                                    i,
-                                );
-                                if let Some(naive) = naive_date {
-                                    vec.push(naive);
-                                }
-                            }
-                        }
-                        NWeekday::Nth(n, weekday) => {
-                            if *n > 0 {
-                                let naive_date = NaiveDate::from_weekday_of_month_opt(
-                                    curr_month.year,
-                                    curr_month.month,
-                                    *weekday,
-                                    *n as u8,
-                                );
-                                if let Some(naive) = naive_date {
-                                    vec.push(naive);
-                                }
-                            } else {
-                                // 下面处理 n < 0 的场景
-                                let first_day_of_month =
-                                    NaiveDate::from_ymd_opt(curr_month.year, curr_month.month, 1)
-                                        .unwrap();
-                                let last_day_of_month =
-                                    Self::get_last_day_of_month(curr_month.year, curr_month.month);
-                                let mut date = last_day_of_month;
-
-                                // 找到最后一个weekday
-                                while date.weekday() != *weekday {
-                                    date = date.pred_opt().unwrap();
-                                }
-
-                                let diff = *n + 1;
-                                date = date + Duration::weeks(diff as i64);
-                                if date >= first_day_of_month {
-                                    vec.push(date);
-                                }
-                            }
-                        }
-                    }
-                    return vec;
+                   Self::get_weekday_by_nweekday_of_month(curr_month.year, curr_month.month, n_weekday)
                 })
                 .flatten()
                 .collect::<Vec<NaiveDate>>();
@@ -382,131 +312,222 @@ impl RRuleSet {
         Ok(dates)
     }
 
-    fn expand_by_year(&self) -> Result<Vec<PointTime>, String> {
-        let point_time = self.start_point_time.as_ref().unwrap();
-        let rrule = self.rrule.get(0).unwrap();
-        let max = if rrule.count == 0 {
-            65535
-        } else {
-            rrule.count as usize
-        };
-        let interval = rrule.interval;
-        let end_time = if let Some(until) = &rrule.until {
-            &until
-        } else {
-            &self.max_until_time
-        };
+    // fn expand_by_year(&self) -> Result<Vec<PointTime>, String> {
+    //     let point_time = self.start_point_time.as_ref().unwrap();
+    //     let rrule = self.rrule.get(0).unwrap();
+    //     let max = if rrule.count == 0 {
+    //         65535
+    //     } else {
+    //         rrule.count as usize
+    //     };
+    //     let interval = rrule.interval;
+    //     let end_time = if let Some(until) = &rrule.until {
+    //         &until
+    //     } else {
+    //         &self.max_until_time
+    //     };
 
-        let naive_dt_start =
-            NaiveDate::from_ymd_opt(point_time.year, point_time.month, point_time.day).unwrap();
-        let naive_end_time =
-            NaiveDate::from_ymd_opt(end_time.year, end_time.month, end_time.day).unwrap();
+    //     let naive_dt_start =
+    //         NaiveDate::from_ymd_opt(point_time.year, point_time.month, point_time.day).unwrap();
+    //     let naive_end_time =
+    //         NaiveDate::from_ymd_opt(end_time.year, end_time.month, end_time.day).unwrap();
 
-        let by_month = &rrule.by_month;
+    //     let by_month = &rrule.by_month;
 
-        let generate_by_year = |curr_year: i32, vec: &mut Vec<PointTime>| -> Vec<PointTime> {
-            // 什么条件都没有的时候，就是按年循环
-            if rrule.by_year_day.is_empty()
-                && rrule.by_month_day.is_empty()
-                && rrule.by_month.is_empty()
-                && rrule.by_week_no.is_empty()
-                && rrule.by_day.is_empty()
-            {
-                let time = NaiveDate::from_ymd_opt(
-                    curr_year,
-                    naive_dt_start.month(),
-                    naive_dt_start.day(),
-                );
-                return if time.is_some() { vec![PointTime {
-                    year: curr_year,
-                    month: naive_dt_start.month(),
-                    day: naive_dt_start.day(),
-                    hour: point_time.hour,
-                    min: point_time.min,
-                    sec: point_time.sec,
-                }] } else { vec![] };
-            }
-            
-            // 先缓存符合一定条件的，再过滤不符合另一部分条件的
-            let mut list: Vec<NaiveDate> = vec![];
+    //     //
+    //     let generate_by_year = |curr_year: i32, vec: &mut Vec<PointTime>| -> Vec<PointTime> {
+    //         // 只有BYMONTH不会降级
+    //         if rrule.by_year_day.is_empty()
+    //             && rrule.by_month_day.is_empty()
+    //             && rrule.by_week_no.is_empty()
+    //             && rrule.by_day.is_empty()
+    //         {
+    //             return (if rrule.by_month.is_empty() {
+    //                 &vec![point_time.month as u8]
+    //             } else {
+    //                 &rrule.by_month
+    //             })
+    //             .iter()
+    //             .map(|month| {
+    //                 let time =
+    //                     NaiveDate::from_ymd_opt(curr_year, *month as u32, naive_dt_start.day());
+    //                 if let Some(time) = time {
+    //                     return Some(PointTime {
+    //                         year: curr_year,
+    //                         month: time.month(),
+    //                         day: time.day(),
+    //                         hour: point_time.hour,
+    //                         min: point_time.min,
+    //                         sec: point_time.sec,
+    //                     });
+    //                 } else {
+    //                     return None;
+    //                 }
+    //             })
+    //             .filter(|n| n.is_some())
+    //             .map(|n| n.unwrap())
+    //             .collect::<Vec<PointTime>>();
+    //         }
 
-            // 先生成所有的year_day
-            let vec_by_year_day = rrule
-                .by_year_day
-                .iter()
-                .map(|day| Self::get_nth_day_of_year(curr_year, *day))
-                .filter(|n| n.is_some())
-                .map(|n| n.unwrap())
-                .collect::<Vec<NaiveDate>>();
-            // 如果指定了yearday但是无结果，则直接返回，如果有，push到list里
-            if !rrule.by_year_day.is_empty() {
-                if vec_by_year_day.is_empty() {
-                    return vec![];
-                }
-                vec_by_year_day.into_iter().for_each(|n| list.push(n));
-            };
+    //         // 先缓存符合一定条件的，再过滤不符合另一部分条件的
+    //         let mut list: Vec<NaiveDate> = vec![];
 
-            let vec_by_month_day = rrule
-                .by_month_day
-                .iter()
-                .map(|month_day| {
-                    (1..12)
-                        .into_iter()
-                        .filter(|month_day| {
-                            if rrule.by_month.is_empty() {
-                                true
-                            } else {
-                                rrule.by_month.contains(month_day)
-                            }
-                        })
-                        .map(|i| Self::get_nth_day_of_month(curr_year, i as u32, *month_day))
-                        .filter(|n| n.is_some())
-                        .map(|n| n.unwrap())
-                        .collect::<Vec<NaiveDate>>()
-                })
-                .flatten()
-                .collect::<Vec<NaiveDate>>();
+    //         // 先生成所有的year_day
+    //         let vec_by_year_day = rrule
+    //             .by_year_day
+    //             .iter()
+    //             .map(|day| Self::get_nth_day_of_year(curr_year, *day))
+    //             .filter(|n| n.is_some())
+    //             .map(|n| n.unwrap())
+    //             .collect::<Vec<NaiveDate>>();
 
-            // 如果指定了bymonthday但是无结果，则直接返回
-            // 如果有值，则判断是做交集还是直接塞入
-            // 运算完后还是没有，则直接返回
-            if !rrule.by_month_day.is_empty() {
-                if vec_by_month_day.is_empty() {
-                    return vec![];
-                }
-                if !list.is_empty() {
-                    list = list
-                        .into_iter()
-                        .filter(|n| vec_by_month_day.contains(&n))
-                        .collect::<Vec<NaiveDate>>();
-                } else {
-                    vec_by_month_day.into_iter().for_each(|n| list.push(n));
-                }
-                if list.is_empty() {
-                    return vec![];
-                }
-            };
+    //         // 如果指定了yearday但是无结果，则直接返回，如果有，push到list里
+    //         if !rrule.by_year_day.is_empty() {
+    //             if vec_by_year_day.is_empty() {
+    //                 return vec![];
+    //             }
+    //             vec_by_year_day.into_iter().for_each(|n| list.push(n));
+    //         };
 
-            if !rrule.by_month.is_empty() {
-                let vec_by_month = rrule.by_month.iter().map(|month| {
-                    
-                });
-            }
+    //         // 有则降级为月，但是与by_month可以直接取交集，所以直接获取所有
+    //         let vec_by_month_day = rrule
+    //             .by_month_day
+    //             .iter()
+    //             .map(|month_day| {
+    //                 (1..12)
+    //                     .filter(|month_day| {
+    //                         if rrule.by_month.is_empty() {
+    //                             true
+    //                         } else {
+    //                             rrule.by_month.contains(month_day)
+    //                         }
+    //                     })
+    //                     .map(|i| Self::get_nth_day_of_month(curr_year, i as u32, *month_day))
+    //                     .filter(|n| n.is_some())
+    //                     .map(|n| n.unwrap())
+    //                     .collect::<Vec<NaiveDate>>()
+    //             })
+    //             .flatten()
+    //             .collect::<Vec<NaiveDate>>();
 
-            // by_month.iter().for_each(|month| {})
+    //         // 如果指定了bymonthday但是无结果，则直接返回
+    //         // 如果有值，则判断与list是做交集还是直接塞入
+    //         // 运算完后还是没有，则直接返回
+    //         if !rrule.by_month_day.is_empty() {
+    //             if vec_by_month_day.is_empty() {
+    //                 return vec![];
+    //             }
+    //             if !list.is_empty() {
+    //                 list = list
+    //                     .into_iter()
+    //                     .filter(|n| vec_by_month_day.contains(&n))
+    //                     .collect::<Vec<NaiveDate>>();
+    //             } else {
+    //                 vec_by_month_day.into_iter().for_each(|n| list.push(n));
+    //             }
+    //             if list.is_empty() {
+    //                 return vec![];
+    //             }
+    //         };
 
-            // 如果有year
-        };
+    //         // by_month和by_month_day结合会强制限定为某月某日，但是该逻辑已经在上面处理过了，所以只需要考虑by_month_day不存在的场景
+    //         // 如果此时存在by_day，则会强制为该月所有周或指定周，类似于按月循环，可直接调用按月循环逻辑
+    //         // 过滤指定月份的起始日期的天数
+    //         if rrule.by_month_day.is_empty() && !rrule.by_month.is_empty() {
+    //             let vec_by_month = rrule
+    //                 .by_month
+    //                 .iter()
+    //                 .map(|month| NaiveDate::from_ymd_opt(curr_year, *month as u32, point_time.day))
+    //                 .filter(|n| n.is_some())
+    //                 .map(|n| n.unwrap())
+    //                 .collect::<Vec<NaiveDate>>();
 
-        let mut result: Vec<PointTime> = vec![];
+    //             if !list.is_empty() {
+    //                 list = list
+    //                     .into_iter()
+    //                     .filter(|n| vec_by_month.contains(&n))
+    //                     .collect::<Vec<NaiveDate>>();
+    //             } else {
+    //                 vec_by_month.into_iter().for_each(|n| list.push(n));
+    //             }
+    //             if list.is_empty() {
+    //                 return vec![];
+    //             }
+    //         }
 
-        // ByDay(Vec<NWeekday>),
-        // ByMonthDay(Vec<i16>) 获取，已处理,
-        // ByYearDay 获取，已处理,
-        // ByWeekNo 获取，过滤,
-        // ByMonth,
-        // BySetPos,
-    }
+    //         // week_no只能跟by_day交集
+    //         if !rrule.by_week_no.is_empty() {
+    //             let vec_by_week_no = rrule
+    //                 .by_week_no
+    //                 .iter()
+    //                 .map(|week_no| {
+    //                     return Self::get_all_weekday()
+    //                         .into_iter()
+    //                         .filter(|weekday| {
+    //                             if rrule.by_day.is_empty() {
+    //                                 true
+    //                             } else {
+    //                                 rrule.by_day.contains(&NWeekday::Every(*weekday))
+    //                             }
+    //                         })
+    //                         .map(|weekday| {
+    //                             // NaiveDate::from_isoywd_opt(curr_year, *week_no as u32, weekday)
+    //                             if let Some(start) = Self::get_nth_week_of_year(curr_year, *week_no)
+    //                             {
+    //                                 return Some(Self::get_weekday_of_week(&start, weekday));
+    //                             }
+    //                             None
+    //                         })
+    //                         .filter(|n| n.is_some())
+    //                         .map(|n| n.unwrap())
+    //                         .collect::<Vec<NaiveDate>>();
+    //                 })
+    //                 .flatten()
+    //                 .collect::<Vec<NaiveDate>>();
+
+    //             if !list.is_empty() {
+    //                 list = list
+    //                     .into_iter()
+    //                     .filter(|n| vec_by_week_no.contains(&n))
+    //                     .collect::<Vec<NaiveDate>>();
+    //             } else {
+    //                 vec_by_week_no.into_iter().for_each(|n| list.push(n));
+    //             }
+    //             if list.is_empty() {
+    //                 return vec![];
+    //             }
+    //         };
+
+    //         // 先找到所有符合条件的日期，需要支持正负
+    //         //
+    //         if !rrule.by_day.is_empty() {
+    //             let vec_by_day = rrule.by_day.iter().map(|day| {
+    //                 if rrule.by_month.is_empty() {
+    //                     // 如果没有指定月份，则只能找到全年里所有的指定日期
+    //                     match day {
+    //                         NWeekday::Every(_) => todo!(),
+    //                         NWeekday::Nth(_, _) => todo!(),
+    //                     }
+    //                 } else {
+    //                     // 如果指定了月份，则找当月的指定日期
+    //                     rrule.by_month
+    //                 }
+    //             });
+    //         }
+
+    //         return list;
+    //     };
+
+    //     let mut result: Vec<PointTime> = vec![];
+
+    //     // ByDay(Vec<NWeekday>) 过滤/获取, 有则降级为按周循环
+    //     // ByMonthDay(Vec<i16>) 获取，已处理, 有则降级为每月几号
+    //     // ByYearDay 获取，已处理,
+    //     // ByWeekNo 获取，过滤,
+    //     // ByMonth, 有则指定月
+    //     // BySetPos,
+    //     // 需要使用dt_start+limit 来限制一下，用于优化
+    // }
 
     fn get_datetime_by_point_time(point_time: &PointTime, _tz: &Tz) -> DateTime<Tz> {
         Tz::UTC
@@ -518,16 +539,15 @@ impl RRuleSet {
     /// 获取某月第n天，支持正负
     fn get_nth_day_of_month(year: i32, month: u32, ordinal: i16) -> Option<NaiveDate> {
         if ordinal > 0 {
-            return NaiveDate::from_ymd_opt(year + 1, month, ordinal as u32);
+            return NaiveDate::from_ymd_opt(year, month, ordinal as u32);
         }
         if ordinal < 0 {
-            let first_day_of_next_month = if month == 12 {
-                NaiveDate::from_ymd_opt(year + 1, 1, 1)
-            } else {
-                NaiveDate::from_ymd_opt(year, month + 1, 1)
-            };
-
-            return first_day_of_next_month.unwrap().pred_opt();
+            let last = Self::get_last_day_of_month(year, month);
+            let last_day = last.day();
+            if last_day as i16 + ordinal + 1 > 0 {
+                let curr = last.with_day((last_day as i16 + ordinal + 1) as u32);
+                return curr;
+            }
         }
         return None;
     }
@@ -558,6 +578,125 @@ impl RRuleSet {
             return None;
         }
         return None;
+    }
+
+    /// 获取指定周数的周一
+    fn get_nth_week_of_year(year: i32, week_no: i8) -> Option<NaiveDate> {
+        if week_no > 0 {
+            return NaiveDate::from_isoywd_opt(year, week_no as u32, Weekday::Mon);
+        }
+        if week_no < 0 {
+            let week = -week_no as u32;
+            let date = NaiveDate::from_ymd_opt(year, 12, 31).unwrap(); // 创建日期对象，表示当年的12月31日
+            let weekday = date.weekday(); // 获取当天是星期几
+
+            let days_until_last_week = match weekday {
+                Weekday::Mon => 6, // 如果当天是星期一，则离最后一周还有6天
+                Weekday::Tue => 5, // 如果当天是星期二，则离最后一周还有5天
+                Weekday::Wed => 4, // 如果当天是星期三，则离最后一周还有4天
+                Weekday::Thu => 3, // 如果当天是星期四，则离最后一周还有3天
+                Weekday::Fri => 2, // 如果当天是星期五，则离最后一周还有2天
+                Weekday::Sat => 1, // 如果当天是星期六，则离最后一周还有1天
+                Weekday::Sun => 0, // 如果当天是星期日，则离最后一周还有0天
+            };
+
+            let last_week_start = date - Duration::days(days_until_last_week as i64); // 计算最后一周的开始日期
+            let last_week_end = date; // 最后一周的结束日期即为当天
+
+            let week_diff = last_week_end.iso_week().week() + week; // 计算要获取的周数与最后一周的周数差
+
+            if week_diff >= 0 {
+                return Some(last_week_start - Duration::weeks(week_diff as i64));
+            // 返回指定周数的开始日期
+            } else {
+                return None; // 如果指定的周数超过了最后一周的周数，则返回None
+            }
+        }
+        return None;
+    }
+
+    /// 给定一周的开始，返回指定星期的日期
+    fn get_weekday_of_week(date: &NaiveDate, weekday: Weekday) -> NaiveDate {
+        let diff = match weekday {
+            Weekday::Mon => 0, // 如果当天是星期一，则离最后一周还有6天
+            Weekday::Tue => 1, // 如果当天是星期二，则离最后一周还有5天
+            Weekday::Wed => 2, // 如果当天是星期三，则离最后一周还有4天
+            Weekday::Thu => 3, // 如果当天是星期四，则离最后一周还有3天
+            Weekday::Fri => 4, // 如果当天是星期五，则离最后一周还有2天
+            Weekday::Sat => 5, // 如果当天是星期六，则离最后一周还有1天
+            Weekday::Sun => 6, // 如果当天是星期日，则离最后一周还有0天
+        };
+        *date + Duration::days(diff)
+    }
+
+    /// 获取一周7天的数据
+    fn get_all_weekday() -> Vec<Weekday> {
+        return vec![
+            Weekday::Mon,
+            Weekday::Tue,
+            Weekday::Wed,
+            Weekday::Thu,
+            Weekday::Fri,
+            Weekday::Sat,
+            Weekday::Sun,
+        ];
+    }
+
+    /// 获取指定月份所有指定的星期
+    fn get_all_weekday_of_month(year: i32, month: u32, weekday: Weekday) -> Vec<NaiveDate> {
+        (1..5)
+            .map(|n| NaiveDate::from_weekday_of_month_opt(year, month, weekday, n))
+            .filter(|n| n.is_some())
+            .map(|n| n.unwrap())
+            .collect::<Vec<NaiveDate>>()
+    }
+
+    /// 获取指定月份下第n个周的星期
+    fn get_nth_weekday_of_month(
+        year: i32,
+        month: u32,
+        weekday: &Weekday,
+        n: i16,
+    ) -> Option<NaiveDate> {
+        if n > 0 {
+            return NaiveDate::from_weekday_of_month_opt(year, month, *weekday, n as u8);
+        }
+        // 下面处理 n < 0 的场景
+        let first_day_of_month = NaiveDate::from_ymd_opt(year, month, 1).unwrap();
+        let last_day_of_month = Self::get_last_day_of_month(year, month);
+        let mut date = last_day_of_month;
+
+        // 找到最后一个weekday
+        while date.weekday() != *weekday {
+            date = date.pred_opt().unwrap();
+        }
+
+        let diff = n + 1;
+        date = date + Duration::weeks(diff as i64);
+        if date >= first_day_of_month {
+            return Some(date);
+        }
+        return None;
+    }
+
+    /// 获取指定月份下，第n_weekday的时间列表
+    fn get_weekday_by_nweekday_of_month(
+        year: i32,
+        month: u32,
+        n_weekday: &NWeekday,
+    ) -> Vec<NaiveDate> {
+        let mut vec: Vec<NaiveDate> = vec![];
+        match n_weekday {
+            NWeekday::Every(weekday) => Self::get_all_weekday_of_month(year, month, *weekday)
+                .into_iter()
+                .for_each(|n| vec.push(n)),
+            NWeekday::Nth(n, weekday) => {
+                if let Some(time) = Self::get_nth_weekday_of_month(year, month, weekday, *n) {
+                    vec.push(time)
+                }
+            }
+        };
+        return vec;
     }
 }
 
