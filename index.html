@@ -13,6 +13,7 @@
   <body>
     <script type="module">
       import init, { JsRRule, JsRRuleSet } from './pkg/sl_rrule_rust.js';
+      console.time('start')
       init().then(() => {
         console.time('time');
         // const rrule = new JsRRule(
@@ -29,6 +30,7 @@
             .map((str) => new Date(Number(str)).toISOString())
         );
         console.timeEnd('time');
+        console.timeEnd('start')
       });
     </script>
   </body>

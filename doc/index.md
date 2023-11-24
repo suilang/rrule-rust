@@ -2,7 +2,7 @@
    1. 支持interval
    2. 不按byday
 2. week
-   1. 支持byday,但不处理正负
+   1. 支持byday
    2. 支持interval
    3. 支持count和until，count优先
    4. 支持wkst
@@ -10,3 +10,6 @@
    1. 支持byday和bymonthday，同时存在则取交集，支持正负
    2. 支持count和until，count优先
    3. 最大检索2300年的数据
+
+
+bysetpos暂不实现

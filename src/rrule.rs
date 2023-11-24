@@ -8,7 +8,6 @@ mod frequency;
 pub use frequency::Frequency;
 pub mod weekday;
 
-
 #[derive(Debug)]
 pub enum RRuleProperty {
     Freq(Frequency),
@@ -20,9 +19,9 @@ pub enum RRuleProperty {
     ByHour,
     ByDay(Vec<NWeekday>),
     ByMonthDay(Vec<i16>),
-    ByYearDay,
-    ByWeekNo,
-    ByMonth,
+    ByYearDay(Vec<i16>),
+    ByWeekNo(Vec<i8>),
+    ByMonth(Vec<u8>),
     BySetPos,
     Wkst(Weekday),
 }
@@ -46,12 +45,38 @@ impl FromStr for RRuleProperty {
             "BYMINUTE" => Self::ByMinute,
             "BYHOUR" => Self::ByHour,
             "BYWEEKDAY" | "BYDAY" => Self::ByDay(parse_weekdays(value).unwrap()),
-            "BYMONTHDAY" => {
-                Self::ByMonthDay(value.split(",").map(|s| s.parse().unwrap_or(0)).collect())
-            }
-            "BYYEARDAY" => Self::ByYearDay,
-            "BYWEEKNO" => Self::ByWeekNo,
-            "BYMONTH" => Self::ByMonth,
+            "BYMONTHDAY" => Self::ByMonthDay(
+                value
+                    .split(",")
+                    .map(|s| s.parse())
+                    .filter(|s| s.is_ok())
+                    .map(|s| s.unwrap())
+                    .collect::<Vec<_>>(),
+            ),
+            "BYYEARDAY" => Self::ByYearDay(
+                value
+                    .split(",")
+                    .map(|s| s.parse::<i16>())
+                    .filter(|s| s.is_ok())
+                    .map(|s| s.unwrap())
+                    .collect::<Vec<_>>(),
+            ),
+            "BYWEEKNO" => Self::ByWeekNo(
+                value
+                    .split(",")
+                    .map(|s| s.parse::<i8>())
+                    .filter(|s| s.is_ok())
+                    .map(|s| s.unwrap())
+                    .collect::<Vec<_>>(),
+            ),
+            "BYMONTH" => Self::ByMonth(
+                value
+                    .split(",")
+                    .map(|s| s.parse::<u8>())
+                    .filter(|s| s.is_ok())
+                    .map(|s| s.unwrap())
+                    .collect::<Vec<_>>(),
+            ),
             "BYSETPOS" => Self::BySetPos,
             "WKST" => Self::Wkst(str_to_weekday(value).unwrap()),
             _ => return Err(s.into()),
@@ -68,6 +93,11 @@ pub struct RRule {
     pub interval: u32,
     pub week_start: Weekday,
     pub by_month_day: Vec<i16>,
+    pub by_year_day: Vec<i16>,
+    pub by_week_no: Vec<i8>,
+    pub by_month: Vec<u8>,
+    // ByYearDay,
+    // BySetPos,
 }
 impl RRule {
     pub fn default() -> RRule {
@@ -79,6 +109,9 @@ impl RRule {
             interval: 1,
             week_start: Weekday::Sun,
             by_month_day: vec![],
+            by_year_day: vec![],
+            by_week_no: vec![],
+            by_month: vec![],
         }
     }
     // 解析字符串，RRULE:FREQ=DAILY;COUNT=3。单行，不处理dt_start
@@ -136,10 +169,11 @@ impl RRule {
             interval,
             week_start,
             by_month_day,
+            ..RRule::default()
         }
     }
 
-    pub fn set_count(&mut self, count: u32){
+    pub fn set_count(&mut self, count: u32) {
         self.count = count;
     }
 }

@@ -1,36 +1,38 @@
+use std::ops::Range;
+
 use crate::point_time::PointTime;
 use crate::rrule::weekday::NWeekday;
-use crate::rrule::{get_tz_from_str, parse_dt_strart_str, RRule};
+use crate::rrule::{self, get_tz_from_str, parse_dt_strart_str, RRule};
 use chrono::{DateTime, Datelike, Duration, NaiveDate, TimeZone, Weekday};
 use chrono_tz::Tz;
 
-const MAX_UNTIL_STR: &str = "20300101T000000Z";
+const MAX_UNTIL_STR: &str = "23000101T000000Z";
 #[derive(Debug)]
 pub struct RRuleSet {
     rrule: Vec<RRule>,
     tz: Tz,
     start_point_time: Option<PointTime>,
+    max_until_time: PointTime,
 }
 
 impl RRuleSet {
     // 解析整个字符串，单行，不处理dt_start
     pub fn from_str(s: &str) -> Result<RRuleSet, String> {
         let lines: Vec<_> = s.split("\n").collect();
+        let rrule: RRule;
+        let mut start_point_time: Option<PointTime> = None;
         if lines.len() == 2 {
-            let start_point_time = parse_dt_strart_str(lines[0])?;
-
-            let rrule = RRule::from_str(lines[1]);
-            return Ok(RRuleSet {
-                rrule: vec![rrule],
-                start_point_time: Some(start_point_time),
-                tz: Tz::UTC,
-            });
+            start_point_time = Some(parse_dt_strart_str(lines[0])?);
+            rrule = RRule::from_str(lines[1]);
+        } else {
+            rrule = RRule::from_str(lines[0]);
         }
-        let rrule = RRule::from_str(lines[0]);
+
         Ok(RRuleSet {
             rrule: vec![rrule],
             tz: Tz::UTC,
-            start_point_time: None,
+            start_point_time: start_point_time,
+            max_until_time: MAX_UNTIL_STR.parse::<PointTime>().unwrap(),
         })
     }
     pub fn add_rrule(&mut self, rrule: &str) {
@@ -212,9 +214,9 @@ impl RRuleSet {
         let limit = rrule.count;
         let interval = rrule.interval;
         let end_time = if let Some(until) = &rrule.until {
-            until.clone()
+            &until
         } else {
-            MAX_UNTIL_STR.parse::<PointTime>().unwrap()
+            &self.max_until_time
         };
         let max = if limit == 0 { 65535 } else { limit as usize };
 
@@ -370,7 +372,7 @@ impl RRuleSet {
         let mut curr_month = point_time.clone();
         let mut dates: Vec<PointTime> = vec![];
 
-        while dates.len() < max && curr_month < end_time {
+        while dates.len() < max && curr_month < *end_time {
             generate_dates_in_month(&curr_month, &mut dates);
             curr_month = curr_month.add_month(interval);
         }
@@ -380,6 +382,132 @@ impl RRuleSet {
         Ok(dates)
     }
 
+    fn expand_by_year(&self) -> Result<Vec<PointTime>, String> {
+        let point_time = self.start_point_time.as_ref().unwrap();
+        let rrule = self.rrule.get(0).unwrap();
+        let max = if rrule.count == 0 {
+            65535
+        } else {
+            rrule.count as usize
+        };
+        let interval = rrule.interval;
+        let end_time = if let Some(until) = &rrule.until {
+            &until
+        } else {
+            &self.max_until_time
+        };
+
+        let naive_dt_start =
+            NaiveDate::from_ymd_opt(point_time.year, point_time.month, point_time.day).unwrap();
+        let naive_end_time =
+            NaiveDate::from_ymd_opt(end_time.year, end_time.month, end_time.day).unwrap();
+
+        let by_month = &rrule.by_month;
+
+        let generate_by_year = |curr_year: i32, vec: &mut Vec<PointTime>| -> Vec<PointTime> {
+            // 什么条件都没有的时候，就是按年循环
+            if rrule.by_year_day.is_empty()
+                && rrule.by_month_day.is_empty()
+                && rrule.by_month.is_empty()
+                && rrule.by_week_no.is_empty()
+                && rrule.by_day.is_empty()
+            {
+                let time = NaiveDate::from_ymd_opt(
+                    curr_year,
+                    naive_dt_start.month(),
+                    naive_dt_start.day(),
+                );
+                return if time.is_some() { vec![PointTime {
+                    year: curr_year,
+                    month: naive_dt_start.month(),
+                    day: naive_dt_start.day(),
+                    hour: point_time.hour,
+                    min: point_time.min,
+                    sec: point_time.sec,
+                }] } else { vec![] };
+            }
+            
+            // 先缓存符合一定条件的，再过滤不符合另一部分条件的
+            let mut list: Vec<NaiveDate> = vec![];
+
+            // 先生成所有的year_day
+            let vec_by_year_day = rrule
+                .by_year_day
+                .iter()
+                .map(|day| Self::get_nth_day_of_year(curr_year, *day))
+                .filter(|n| n.is_some())
+                .map(|n| n.unwrap())
+                .collect::<Vec<NaiveDate>>();
+            // 如果指定了yearday但是无结果，则直接返回，如果有，push到list里
+            if !rrule.by_year_day.is_empty() {
+                if vec_by_year_day.is_empty() {
+                    return vec![];
+                }
+                vec_by_year_day.into_iter().for_each(|n| list.push(n));
+            };
+
+            let vec_by_month_day = rrule
+                .by_month_day
+                .iter()
+                .map(|month_day| {
+                    (1..12)
+                        .into_iter()
+                        .filter(|month_day| {
+                            if rrule.by_month.is_empty() {
+                                true
+                            } else {
+                                rrule.by_month.contains(month_day)
+                            }
+                        })
+                        .map(|i| Self::get_nth_day_of_month(curr_year, i as u32, *month_day))
+                        .filter(|n| n.is_some())
+                        .map(|n| n.unwrap())
+                        .collect::<Vec<NaiveDate>>()
+                })
+                .flatten()
+                .collect::<Vec<NaiveDate>>();
+
+            // 如果指定了bymonthday但是无结果，则直接返回
+            // 如果有值，则判断是做交集还是直接塞入
+            // 运算完后还是没有，则直接返回
+            if !rrule.by_month_day.is_empty() {
+                if vec_by_month_day.is_empty() {
+                    return vec![];
+                }
+                if !list.is_empty() {
+                    list = list
+                        .into_iter()
+                        .filter(|n| vec_by_month_day.contains(&n))
+                        .collect::<Vec<NaiveDate>>();
+                } else {
+                    vec_by_month_day.into_iter().for_each(|n| list.push(n));
+                }
+                if list.is_empty() {
+                    return vec![];
+                }
+            };
+
+            if !rrule.by_month.is_empty() {
+                let vec_by_month = rrule.by_month.iter().map(|month| {
+                    
+                });
+            }
+
+            // by_month.iter().for_each(|month| {})
+
+            // 如果有year
+        };
+
+        let mut result: Vec<PointTime> = vec![];
+
+        // ByDay(Vec<NWeekday>),
+        // ByMonthDay(Vec<i16>) 获取，已处理,
+        // ByYearDay 获取，已处理,
+        // ByWeekNo 获取，过滤,
+        // ByMonth,
+        // BySetPos,
+    }
+
     fn get_datetime_by_point_time(point_time: &PointTime, _tz: &Tz) -> DateTime<Tz> {
         Tz::UTC
             .with_ymd_and_hms(point_time.year, point_time.month, point_time.day, 12, 0, 0)
@@ -387,6 +515,22 @@ impl RRuleSet {
             .unwrap()
     }
 
+    /// 获取某月第n天，支持正负
+    fn get_nth_day_of_month(year: i32, month: u32, ordinal: i16) -> Option<NaiveDate> {
+        if ordinal > 0 {
+            return NaiveDate::from_ymd_opt(year + 1, month, ordinal as u32);
+        }
+        if ordinal < 0 {
+            let first_day_of_next_month = if month == 12 {
+                NaiveDate::from_ymd_opt(year + 1, 1, 1)
+            } else {
+                NaiveDate::from_ymd_opt(year, month + 1, 1)
+            };
+
+            return first_day_of_next_month.unwrap().pred_opt();
+        }
+        return None;
+    }
     /// 获取该月最后一天
     fn get_last_day_of_month(year: i32, month: u32) -> NaiveDate {
         let first_day_of_next_month = if month == 12 {
@@ -396,6 +540,24 @@ impl RRuleSet {
         };
 
         first_day_of_next_month.unwrap().pred_opt().unwrap()
+    }
+
+    /// 获取每年第n天，支持正负数
+    fn get_nth_day_of_year(year: i32, ordinal: i16) -> Option<NaiveDate> {
+        if ordinal > 0 {
+            return NaiveDate::from_yo_opt(year, ordinal as u32);
+        }
+        if ordinal < 0 {
+            let first_day_of_year = NaiveDate::from_ymd_opt(year, 1, 1).unwrap();
+            let last_day_of_year = NaiveDate::from_ymd_opt(year, 12, 31).unwrap();
+            let last_nth_day_of_year = last_day_of_year - chrono::Duration::days(40);
+
+            if last_nth_day_of_year >= first_day_of_year {
+                return Some(last_nth_day_of_year);
+            }
+            return None;
+        }
+        return None;
     }
 }
 
@@ -407,16 +569,9 @@ mod test {
 
     #[test]
     fn test_expand_by_day() {
-        let point_time = "20231023T180000Z".parse().unwrap();
-        let set = RRuleSet {
-            start_point_time: Some(point_time),
-            rrule: vec![RRule {
-                freq: Frequency::Daily,
-                count: 10,
-                ..RRule::default()
-            }],
-            tz: Tz::UTC,
-        };
+        let set: RRuleSet =
+            RRuleSet::from_str("DTSTART:20231023T180000Z\nRRULE:FREQ=DAILY;COUNT=10").unwrap();
+
         let dates = set.expand_by_day().unwrap();
         assert_eq!(dates.len(), 10);
 
@@ -428,42 +583,18 @@ mod test {
     }
     #[test]
     fn test_expand_by_day_interval2() {
-        let point_time = "20231023T180000Z".parse().unwrap();
-        let set = RRuleSet {
-            start_point_time: Some(point_time),
-            rrule: vec![RRule {
-                freq: Frequency::Daily,
-                interval: 2,
-                count: 5,
-                ..RRule::default()
-            }],
-            tz: Tz::UTC,
-        };
+        let set =
+            RRuleSet::from_str("DTSTART:20231023T180000Z\nRRULE:FREQ=DAILY;COUNT=5;INTERVAL=2")
+                .unwrap();
+
         let dates = set.expand_by_day().unwrap();
         assert_eq!(dates.len(), 5);
 
         let first = dates.get(0).unwrap();
-        assert_eq!(
-            first,
-            &PointTime {
-                year: 2023,
-                month: 10,
-                day: 23,
-                hour: 18,
-                min: 0,
-                sec: 0,
-            }
-        );
+        assert_eq!(first, &"20231023T180000".parse::<PointTime>().unwrap());
 
         let last = dates.get(4).unwrap();
-        assert_eq!(
-            last,
-            &PointTime {
-                month: 10,
-                day: 31,
-                ..set.start_point_time.unwrap()
-            }
-        )
+        assert_eq!(last, &"20231031T180000".parse::<PointTime>().unwrap());
     }
 
     #[test]
@@ -483,12 +614,11 @@ mod test {
 
     #[test]
     fn test_expand_by_week_interval2() {
-        let point_time = "20231023T180000Z".parse().unwrap();
-        let set = RRuleSet {
-            start_point_time: Some(point_time),
-            rrule: vec![RRule::from_str("FREQ=WEEKLY;BYDAY=TU;INTERVAL=2;COUNT=2")],
-            tz: Tz::UTC,
-        };
+        let set = RRuleSet::from_str(
+            "DTSTART:20231023T180000Z\nRRULE:FREQ=WEEKLY;BYDAY=TU;INTERVAL=2;COUNT=2",
+        )
+        .unwrap();
+
         let dates = set.expand_by_week().unwrap();
         assert_eq!(dates.len(), 2);
         let first = dates.get(0).unwrap();

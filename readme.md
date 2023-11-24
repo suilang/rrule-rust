@@ -18,7 +18,7 @@ $ yarn add @sl/rrule-rust
 **RRuleSet:**
 
 ```es6
-import init, { JsRRule, JsRRuleSet } from '@sl/rrule-rust';
+import init, { JsRRule, JsRRuleSet } from '@suilang/rrule-rust';
 
 // Create a rule:
 init().then(() => {
@@ -29,6 +29,7 @@ init().then(() => {
     .all()
     .split(',')
     .map((str) => new Date(Number(str)))
+})
 
 [ "2022-05-06T10:00:00.000Z",
 "2022-05-09T10:00:00.000Z",
