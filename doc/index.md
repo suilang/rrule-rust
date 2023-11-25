@@ -1,6 +1,12 @@
 1. daily
    1. 支持interval
    2. 支持byday,但是不识别正负数
+   3. 支持bymonth
+   4. 支持by_month_day
+   5. 支持by_year_day
+   6. 不支持by_set_pos
+   7. 支持by_week_no,性能不好
+
 2. week
    1. 支持byday
    2. 支持interval

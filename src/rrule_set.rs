@@ -1,8 +1,8 @@
 use crate::point_time::PointTime;
-use crate::rrule::weekday::{self, NWeekday};
-use crate::rrule::{self, get_tz_from_str, parse_dt_strart_str, RRule};
+use crate::rrule::weekday::NWeekday;
+use crate::rrule::{get_tz_from_str, parse_dt_strart_str, RRule};
 use chrono::{DateTime, Datelike, Duration, NaiveDate, TimeZone, Weekday};
-use chrono_tz::{Tz, WET};
+use chrono_tz::Tz;
 
 const MAX_UNTIL_STR: &str = "23000101T000000Z";
 #[derive(Debug)]
@@ -144,6 +144,45 @@ impl RRuleSet {
             if !rrule.by_month.is_empty() && !rrule.by_month.contains(&(next.month() as u8)) {
                 next = go_step(next);
                 continue;
+            }
+            if !rrule.by_month_day.is_empty() {
+                let mut flag = false;
+                for day in rrule.by_month_day.iter() {
+                    if Self::is_nth_day_of_month(&next, *day) {
+                        flag = true;
+                        break;
+                    }
+                }
+                if !flag {
+                    next = go_step(next);
+                    continue;
+                }
+            }
+            if !rrule.by_year_day.is_empty() {
+                let mut flag = false;
+                for day in rrule.by_year_day.iter() {
+                    if Self::is_nth_day_of_year(&next, *day) {
+                        flag = true;
+                        break;
+                    }
+                }
+                if !flag {
+                    next = go_step(next);
+                    continue;
+                }
+            }
+            if !rrule.by_week_no.is_empty() {
+                let mut flag = false;
+                for day in rrule.by_week_no.iter() {
+                    if Self::is_in_nth_weekno(&next, *day) {
+                        flag = true;
+                        break;
+                    }
+                }
+                if !flag {
+                    next = go_step(next);
+                    continue;
+                }
             }
             list.push(next.clone());
             next = go_step(next);
@@ -693,7 +732,8 @@ impl RRuleSet {
         if ordinal < 0 {
             let first_day_of_year = NaiveDate::from_ymd_opt(year, 1, 1).unwrap();
             let last_day_of_year = NaiveDate::from_ymd_opt(year, 12, 31).unwrap();
-            let last_nth_day_of_year = last_day_of_year - chrono::Duration::days(40);
+            let last_nth_day_of_year =
+                last_day_of_year + chrono::Duration::days((ordinal + 1) as i64);
 
             if last_nth_day_of_year >= first_day_of_year {
                 return Some(last_nth_day_of_year);
@@ -709,7 +749,7 @@ impl RRuleSet {
             return NaiveDate::from_isoywd_opt(year, week_no as u32, Weekday::Mon);
         }
         if week_no < 0 {
-            let week = -week_no as u32;
+            // let week = -week_no as u32;
             let date = NaiveDate::from_ymd_opt(year, 12, 31).unwrap(); // 创建日期对象，表示当年的12月31日
             let weekday = date.weekday(); // 获取当天是星期几
 
@@ -726,7 +766,7 @@ impl RRuleSet {
             let last_week_start = date - Duration::days(days_until_last_week as i64); // 计算最后一周的开始日期
             let last_week_end = date; // 最后一周的结束日期即为当天
 
-            let week_diff = last_week_end.iso_week().week() + week; // 计算要获取的周数与最后一周的周数差
+            let week_diff = last_week_end.iso_week().week() as i8 + week_no; // 计算要获取的周数与最后一周的周数差
 
             if week_diff >= 0 {
                 return Some(last_week_start - Duration::weeks(week_diff as i64));
@@ -853,12 +893,58 @@ impl RRuleSet {
         }
         return None;
     }
+
+    /// 判断给定的时间是否是指定的某个月中的一天
+    fn is_nth_day_of_month(time: &NaiveDate, day: i16) -> bool {
+        if day > 0 {
+            return time.day() == day as u32;
+        }
+        if day < 0 {
+            let last_day_of_month = Self::get_last_day_of_month(time.year(), time.month());
+            let last_day = last_day_of_month.day() as i16;
+            if day > -31 && (last_day + day + 1) == time.day() as i16 {
+                return true;
+            }
+
+            return false;
+        }
+        return false;
+    }
+
+    /// 判断给定的时间是否是指定的某年中的一天
+    fn is_nth_day_of_year(time: &NaiveDate, day: i16) -> bool {
+        if let Some(rs) = Self::get_nth_day_of_year(time.year(), day) {
+            return &rs == time;
+        }
+        return false;
+    }
+
+    /// 判断给定的时间是否是指定的某周中的一天
+    fn is_in_nth_weekno(time: &NaiveDate, week_no: i8) -> bool {
+        if week_no == 0 {
+            return false;
+        }
+        let iso_week_no = time.iso_week().week();
+        if week_no > 0 {
+            return iso_week_no == week_no as u32;
+        }
+        // 特殊处理下第二年但是属于上年最后一周的场景
+        if week_no == -1 && iso_week_no > 50 && time.month() == 1 {
+            if let Some(rs) = Self::get_nth_week_by_week_no(time.year() - 1, week_no) {
+                return time >= &rs && (*time + Duration::days(7)) > rs;
+            }
+            return false;
+        }
+        if let Some(rs) = Self::get_nth_week_by_week_no(time.year(), week_no) {
+            return time.day() >= rs.day() && time.day() - rs.day() < 7;
+        }
+        return false;
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::rrule::Frequency;
     use chrono_tz::Tz;
 
     #[test]
@@ -875,6 +961,74 @@ mod test {
                 .collect::<Vec<_>>(),
             vec![1]
         )
+    }
+
+    #[test]
+    fn test_is_nth_day_of_month() {
+        assert_eq!(
+            RRuleSet::is_nth_day_of_month(&NaiveDate::from_ymd_opt(2023, 10, 31).unwrap(), -1),
+            true
+        );
+        assert_eq!(
+            RRuleSet::is_nth_day_of_month(&NaiveDate::from_ymd_opt(2023, 10, 30).unwrap(), -1),
+            false
+        );
+        assert_eq!(
+            RRuleSet::is_nth_day_of_month(&NaiveDate::from_ymd_opt(2023, 10, 30).unwrap(), -100),
+            false
+        );
+        assert_eq!(
+            RRuleSet::is_nth_day_of_month(&NaiveDate::from_ymd_opt(2023, 10, 15).unwrap(), 15),
+            true
+        );
+        assert_eq!(
+            RRuleSet::is_nth_day_of_month(&NaiveDate::from_ymd_opt(2023, 10, 30).unwrap(), -2),
+            true
+        );
+    }
+
+    #[test]
+    fn test_is_nth_day_of_year() {
+        assert_eq!(
+            RRuleSet::is_nth_day_of_year(&NaiveDate::from_ymd_opt(2023, 12, 31).unwrap(), -1),
+            true
+        );
+        assert_eq!(
+            RRuleSet::is_nth_day_of_year(&NaiveDate::from_ymd_opt(2023, 12, 30).unwrap(), -2),
+            true
+        );
+        assert_eq!(
+            RRuleSet::is_nth_day_of_year(&NaiveDate::from_ymd_opt(2023, 10, 31).unwrap(), -1),
+            false
+        );
+    }
+
+    #[test]
+    fn test_is_in_nth_weekno() {
+        assert_eq!(
+            RRuleSet::is_in_nth_weekno(&NaiveDate::from_ymd_opt(2021, 1, 1).unwrap(), -1),
+            true
+        );
+        assert_eq!(
+            RRuleSet::is_in_nth_weekno(&NaiveDate::from_ymd_opt(2021, 1, 3).unwrap(), -1),
+            true
+        );
+        assert_eq!(
+            RRuleSet::is_in_nth_weekno(&NaiveDate::from_ymd_opt(2021, 1, 4).unwrap(), -1),
+            false
+        );
+        assert_eq!(
+            RRuleSet::is_in_nth_weekno(&NaiveDate::from_ymd_opt(2020, 12, 27).unwrap(), -1),
+            false
+        );
+        assert_eq!(
+            RRuleSet::is_in_nth_weekno(&NaiveDate::from_ymd_opt(2020, 5, 11).unwrap(), 20),
+            true
+        );
+        assert_eq!(
+            RRuleSet::is_in_nth_weekno(&NaiveDate::from_ymd_opt(2020, 5, 10).unwrap(), 20),
+            false
+        );
     }
 
     #[test]

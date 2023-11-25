@@ -124,6 +124,8 @@ impl RRule {
         let mut week_start = Weekday::Sun;
         let mut by_month_day: Vec<i16> = vec![];
         let mut by_month: Vec<u8> = vec![];
+        let mut by_year_day: Vec<i16> = vec![];
+        let mut by_week_no: Vec<i8> = vec![];
         let lines: Vec<&str> = rrule_str.split(':').collect();
         let parts: Vec<&str> = if lines.len() == 2 {
             lines[1].split(";").collect()
@@ -160,6 +162,12 @@ impl RRule {
                     RRuleProperty::ByMonth(vec) => {
                         by_month = vec;
                     }
+                    RRuleProperty::ByYearDay(vec) => {
+                        by_year_day = vec;
+                    }
+                    RRuleProperty::ByWeekNo(vec) => {
+                        by_week_no = vec;
+                    }
                     // 其他RRule的参数，可以在这里处理
                     _ => {}
                 }
@@ -174,6 +182,8 @@ impl RRule {
             week_start,
             by_month_day,
             by_month,
+            by_year_day,
+            by_week_no,
             ..RRule::default()
         }
     }
