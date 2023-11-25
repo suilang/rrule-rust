@@ -11,7 +11,10 @@
    2. 支持count和until，count优先
    3. 最大检索2300年的数据
 
-
+4. year
+   1. by_weekno的时候，不处理正负by_day
+   2. 此场景下，如果只有by_day被设置，则by_day必须带nth，否则代表着按周循环，可使用按周循环来代替。
+   3. 
 bysetpos暂不实现
 
 

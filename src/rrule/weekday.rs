@@ -1,5 +1,5 @@
-use std::str::FromStr;
 use chrono::Weekday;
+use std::str::FromStr;
 
 #[derive(Debug, PartialEq)]
 pub enum NWeekday {
@@ -50,6 +50,20 @@ impl NWeekday {
             Weekday::Fri => "FR".to_string(),
             Weekday::Sat => "SA".to_string(),
             Weekday::Sun => "SU".to_string(),
+        }
+    }
+
+    pub fn is_every(&self) -> bool {
+        match self {
+            NWeekday::Every(_) => true,
+            NWeekday::Nth(_, _) => false,
+        }
+    }
+
+    pub fn get_nth(&self) -> i16 {
+        match self {
+            NWeekday::Every(_) => 0,
+            NWeekday::Nth(n, _) => *n,
         }
     }
 }
