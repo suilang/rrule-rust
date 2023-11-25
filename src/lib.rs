@@ -1,6 +1,7 @@
-mod point_time;
-mod rrule;
-mod rrule_set;
+pub mod point_time;
+pub mod rrule;
+pub mod rrule_set;
+
 use rrule::RRule;
 use rrule_set::RRuleSet;
 

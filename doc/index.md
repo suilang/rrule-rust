@@ -1,6 +1,6 @@
 1. daily
    1. 支持interval
-   2. 不按byday
+   2. 支持byday,但是不识别正负数
 2. week
    1. 支持byday
    2. 支持interval

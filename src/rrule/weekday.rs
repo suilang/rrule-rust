@@ -22,8 +22,7 @@ impl NWeekday {
     ///
     /// ```
     /// use chrono::Weekday;
-    /// use rrule::NWeekday;
-    ///
+    /// use rrule_rust::rrule::weekday::NWeekday;
     /// let nth_weekday = NWeekday::new(Some(1), Weekday::Mon);
     /// ```
     #[must_use]

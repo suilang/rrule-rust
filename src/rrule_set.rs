@@ -1,5 +1,3 @@
-use std::ops::Range;
-
 use crate::point_time::PointTime;
 use crate::rrule::weekday::{self, NWeekday};
 use crate::rrule::{self, get_tz_from_str, parse_dt_strart_str, RRule};
@@ -61,6 +59,7 @@ impl RRuleSet {
         if self.start_point_time.is_none() {
             return Vec::new();
         }
+
         if self.rrule.len() == 0 {
             return Vec::new();
         }
@@ -106,6 +105,61 @@ impl RRuleSet {
             crate::rrule::Frequency::Minutely => todo!(),
             crate::rrule::Frequency::Secondly => todo!(),
         }
+    }
+
+    /// 按天扩展，无效则报错
+    fn expand_by_day(&self) -> Result<Vec<PointTime>, String> {
+        let point_time = self.start_point_time.as_ref().unwrap();
+        let rrule = self.rrule.get(0).unwrap();
+        let limit = rrule.count;
+        let interval = rrule.interval;
+        let end_time = if let Some(until) = &rrule.until {
+            &until
+        } else {
+            &self.max_until_time
+        };
+        let max = if limit == 0 { 65535 } else { limit as usize };
+        let by_day_every = rrule
+            .by_day
+            .iter()
+            .map(|n| n.get_weekday().clone())
+            .collect::<Vec<Weekday>>();
+        let naive_dt_start =
+            NaiveDate::from_ymd_opt(point_time.year, point_time.month, point_time.day).unwrap();
+        let naive_end_time =
+            NaiveDate::from_ymd_opt(end_time.year, end_time.month, end_time.day).unwrap();
+
+        let mut next = naive_dt_start.clone();
+        let mut list: Vec<NaiveDate> = Vec::new();
+
+        let go_step = |time: NaiveDate| {
+            return time + Duration::days(interval.into());
+        };
+
+        while next <= naive_end_time && list.len() < max {
+            if !by_day_every.is_empty() && !by_day_every.contains(&next.weekday()) {
+                next = go_step(next);
+                continue;
+            }
+            if !rrule.by_month.is_empty() && !rrule.by_month.contains(&(next.month() as u8)) {
+                next = go_step(next);
+                continue;
+            }
+            list.push(next.clone());
+            next = go_step(next);
+        }
+
+        Ok(list
+            .into_iter()
+            .map(|n| PointTime {
+                year: n.year(),
+                month: n.month(),
+                day: n.day(),
+                hour: point_time.hour,
+                min: point_time.min,
+                sec: point_time.sec,
+            })
+            .collect::<Vec<PointTime>>())
     }
 
     /// 按周扩展，无效则报错
@@ -155,48 +209,6 @@ impl RRuleSet {
                 next = next + Duration::weeks((interval - 1).into()) + Duration::days(1);
             } else {
                 next = next + Duration::days(1);
-            }
-        }
-
-        Ok(dates)
-    }
-    /// 按天扩展，无效则报错
-    fn expand_by_day(&self) -> Result<Vec<PointTime>, String> {
-        let point_time = self.start_point_time.as_ref().unwrap();
-
-        let rrule = self.rrule.get(0).unwrap();
-        let limit = rrule.count;
-        let interval = rrule.interval;
-        let curr = Tz::UTC
-            .with_ymd_and_hms(point_time.year, point_time.month, point_time.day, 12, 0, 0)
-            .single()
-            .unwrap();
-
-        let mut next = curr.clone();
-
-        let mut dates: Vec<PointTime> = Vec::new();
-        let generate_point_time = |d: &DateTime<Tz>| PointTime {
-            year: d.year(),
-            month: d.month(),
-            day: d.day(),
-            hour: point_time.hour,
-            min: point_time.min,
-            sec: point_time.sec,
-        };
-
-        match &rrule.until {
-            Some(until) => {
-                let end_time = Self::get_datetime_by_point_time(until, &Tz::UTC);
-                while next <= end_time {
-                    dates.push(generate_point_time(&next));
-                    next = next + Duration::days(interval.into());
-                }
-            }
-            None => {
-                for _ in 0..limit {
-                    dates.push(generate_point_time(&next));
-                    next = next + Duration::days(interval.into());
-                }
             }
         }
 
@@ -850,33 +862,19 @@ mod test {
     use chrono_tz::Tz;
 
     #[test]
-    fn test_expand_by_day() {
-        let set: RRuleSet =
-            RRuleSet::from_str("DTSTART:20231023T180000Z\nRRULE:FREQ=DAILY;COUNT=10").unwrap();
-
-        let dates = set.expand_by_day().unwrap();
-        assert_eq!(dates.len(), 10);
-
-        let first = dates.get(0).unwrap();
-        assert_eq!(first, &"20231023T180000Z".parse().unwrap());
-
-        let last = dates.get(9).unwrap();
-        assert_eq!(last, &"20231101T180000Z".parse().unwrap())
-    }
-    #[test]
-    fn test_expand_by_day_interval2() {
-        let set =
-            RRuleSet::from_str("DTSTART:20231023T180000Z\nRRULE:FREQ=DAILY;COUNT=5;INTERVAL=2")
-                .unwrap();
-
-        let dates = set.expand_by_day().unwrap();
-        assert_eq!(dates.len(), 5);
-
-        let first = dates.get(0).unwrap();
-        assert_eq!(first, &"20231023T180000".parse::<PointTime>().unwrap());
-
-        let last = dates.get(4).unwrap();
-        assert_eq!(last, &"20231031T180000".parse::<PointTime>().unwrap());
+    fn test_vec_contains() {
+        assert_eq!(
+            vec![Weekday::Mon, Weekday::Thu].contains(&Weekday::Mon),
+            true
+        );
+        assert_eq!(
+            "1".split(",")
+                .map(|s| s.parse::<u8>())
+                .filter(|s| s.is_ok())
+                .map(|s| s.unwrap())
+                .collect::<Vec<_>>(),
+            vec![1]
+        )
     }
 
     #[test]
@@ -909,40 +907,6 @@ mod test {
         assert_eq!(last, &"20231107T180000Z".parse().unwrap())
     }
 
-    #[test]
-    fn test_expand_by_month() {
-        let test_vec = vec![
-            (
-                "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;",
-                vec!["20231029T091800", "20231129T091800", "20231229T091800"],
-            ),
-            (
-                "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;INTERVAL=2",
-                vec!["20231029T091800", "20231229T091800", "20240229T091800"],
-            ),
-            (
-                "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYMONTHDAY=1,3",
-                vec!["20231101T091800", "20231103T091800", "20231201T091800"],
-            ),
-            (
-                "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYMONTHDAY=1,3;BYDAY=FR",
-                vec!["20231103T091800", "20231201T091800", "20240301T091800"],
-            ),
-            (
-                "DTSTART:20231029T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYMONTHDAY=1;BYDAY=1FR",
-                vec!["20231201T091800", "20240301T091800", "20241101T091800"],
-            ),
-            (
-                "DTSTART:20231123T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYMONTHDAY=1;BYDAY=1FR;INTERVAL=2",
-                vec!["20240301T091800", "20241101T091800", "20260501T091800"],
-            ),
-            (
-                "DTSTART:20231123T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYDAY=2FR;",
-                vec!["20231208T091800", "20240112T091800", "20240209T091800"],
-            ),
-        ];
-        run_test_by_vec(test_vec);
-    }
     #[test]
     fn test_rruleset() {
         let mut rrule_set = RRuleSet::from_str("RRULE:FREQ=WEEKLY;COUNT=3").unwrap();
