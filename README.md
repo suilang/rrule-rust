@@ -1,10 +1,10 @@
-# @suilang/rrule-rust.js
+# @suilang/rrule-rust
 
 **Library for working with recurrence rules for calendar dates.**  
 
 This is a rrule project written in Rust, which is ultimately packaged as WebAssembly for use. The current version of this project does not strictly adhere to the iCalendar RFC. For example, certain properties may not take effect when the recurring dimension is monthly, weekly, or daily. Additionally, the project has not yet implemented `BYHOURLY`、`BYMINUTELY` and `BYSECONDLY`.
 
-In a standard scenario, it is 5 times faster than rrule-js. If you add timezone, it's 100 times faster.
+In a standard scenario, it is 5 times faster than rrule.js. If you add timezone, it's 100 times faster.
 
 ---
 
@@ -105,7 +105,7 @@ Same as `FREQ=DAILY`.
 
 ## Test
 
-For different loops, as well as most of the various parameter combinations, I have made a comparison with rrule-js to ensure the correctness of the logic. When I'm done with most of the rules, I'll include a github address where can view specific test cases
+For different loops, as well as most of the various parameter combinations, I have made a comparison with rrule-js to ensure the correctness of the logic. When I'm done with most of the rules, I'll include a github address where can view specific test cases.
 
 
 # License
