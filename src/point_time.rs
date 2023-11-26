@@ -194,7 +194,7 @@ mod test {
     }
 
     #[test]
-    fn test_Ord() {
+    fn test_ord() {
         assert_eq!(
             "20231115T191020".parse::<PointTime>().unwrap()
                 < "20231116T191020".parse::<PointTime>().unwrap(),

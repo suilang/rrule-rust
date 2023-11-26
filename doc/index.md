@@ -5,17 +5,26 @@
    4. 支持by_month_day
    5. 支持by_year_day
    6. 不支持by_set_pos
-   7. 支持by_week_no,性能不好
+   7. 支持by_week_no,但是性能不好，默认周一为一周的开始
 
 2. week
-   1. 支持byday
-   2. 支持interval
-   3. 支持count和until，count优先
+   1. 支持interval
+   2. 支持byday,但是不识别正负数
+   3. 支持bymonth
+   4. 支持by_month_day
+   5. 支持by_year_day
+   6. 不支持by_set_pos
+   7. 支持by_week_no,但是性能不好，默认周一为一周的开始
    4. 支持wkst
+
 3. month
-   1. 支持byday和bymonthday，同时存在则取交集，支持正负
-   2. 支持count和until，count优先
-   3. 最大检索2300年的数据
+   1. 支持interval
+   2. 支持byday,但是不识别正负数
+   3. 支持bymonth
+   4. 支持by_month_day
+   5. 支持by_year_day
+   6. 不支持by_set_pos
+   7. 支持by_week_no,但是性能不好，默认周一为一周的开始
 
 4. year
    1. by_weekno的时候，不处理正负by_day

@@ -204,7 +204,7 @@ pub fn parse_dt_strart_str(s: &str) -> Result<PointTime, String> {
 }
 
 /// 找到从给定时间起的下一个指定的星期几的时刻
-fn get_start_time_by_week(time: &DateTime<Tz>, weekday: Weekday) -> DateTime<Tz> {
+pub fn get_start_time_by_week(time: &DateTime<Tz>, weekday: Weekday) -> DateTime<Tz> {
     let currday = time.weekday();
     let mut next = time.clone();
     if currday == weekday {
