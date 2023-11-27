@@ -1,6 +1,6 @@
-# @suilang/rrule-rust
+# @suilang/rrule
 
-**Library for working with recurrence rules for calendar dates.**  
+**Build with rust, 5 faster than rrule.js**  
 
 This is a rrule project written in Rust, which is ultimately packaged as WebAssembly for use. The current version of this project does not strictly adhere to the iCalendar RFC. For example, certain properties may not take effect when the recurring dimension is monthly, weekly, or daily. Additionally, the project has not yet implemented `BYHOURLY`、`BYMINUTELY` and `BYSECONDLY`.
 
@@ -15,7 +15,7 @@ Just install it like a normal npm package. If you are webpack4, you may need fil
 ### Client Side
 
 ```bash
-$ yarn add @suilang/rrule-rust
+$ yarn add @suilang/rrule
 ```
 
 ### Server Side
@@ -27,7 +27,7 @@ Server-side calls are not currently supported, although the packaging is differe
 In es module, you must call the `init` function before you can use the inner function. Don't worry about performance, it may only take a few tens of milliseconds.
 
 ```es6
-import init, { JsRRuleSet } from '@suilang/rrule-rust';
+import init, { JsRRuleSet } from '@suilang/rrule';
 
 init().then(() => {
   const set = new JsRRuleSet('DTSTART:20220506T180000Z\nRRULE:FREQ=WEEKLY;WKST=SU;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR;UNTIL=20231121T235959');
