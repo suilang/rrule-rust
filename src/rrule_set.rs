@@ -1,6 +1,6 @@
 use crate::point_time::PointTime;
 use crate::rrule::weekday::NWeekday;
-use crate::rrule::{get_tz_from_str, parse_dt_strart_str, RRule};
+use crate::rrule::{get_tz_from_str, parse_dt_strart_str_and_tz, RRule};
 use chrono::{DateTime, Datelike, Duration, Months, NaiveDate, Weekday};
 use chrono_tz::Tz;
 
@@ -8,7 +8,7 @@ const MAX_UNTIL_STR: &str = "23000101T000000Z";
 #[derive(Debug)]
 pub struct RRuleSet {
     rrule: Vec<RRule>,
-    tz: Tz,
+    pub tz: Tz,
     start_point_time: Option<PointTime>,
     max_until_time: PointTime,
 }
@@ -18,9 +18,14 @@ impl RRuleSet {
     pub fn from_str(s: &str) -> Result<RRuleSet, String> {
         let lines: Vec<_> = s.split("\n").collect();
         let rrule: RRule;
+        let mut tz = Tz::UTC;
         let mut start_point_time: Option<PointTime> = None;
         if lines.len() == 2 {
-            start_point_time = Some(parse_dt_strart_str(lines[0])?);
+            let (start, tz2) = parse_dt_strart_str_and_tz(lines[0])?;
+            start_point_time = Some(start);
+            if tz2.is_some() {
+                tz = tz2.unwrap();
+            }
             rrule = RRule::from_str(lines[1]);
         } else {
             rrule = RRule::from_str(lines[0]);
@@ -28,7 +33,7 @@ impl RRuleSet {
 
         Ok(RRuleSet {
             rrule: vec![rrule],
-            tz: Tz::UTC,
+            tz,
             start_point_time: start_point_time,
             max_until_time: MAX_UNTIL_STR.parse::<PointTime>().unwrap(),
         })

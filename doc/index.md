@@ -33,16 +33,8 @@
 bysetpos暂不实现
 
 
-FREQ=YEARLY
-不会降级的有 by_month
-强制指定的有 by_year_day by_week_no
-降级为月的 by_month_day
-降级为周的 BYDAY
-
-
-// ByDay(Vec<NWeekday>) 过滤/获取, 有则降级为按周循环
-        // ByMonthDay(Vec<i16>) 获取，已处理, 有则降级为每月几号
-        // ByYearDay 获取，已处理,
-        // ByWeekNo 获取，过滤,
-        // ByMonth, 有则指定月
-        // BySetPos,
+1. 补充无开始时间时使用当前时间解析
+2. 补充对于参数有效性的判断
+3. 补充可设置最大截止时间的能力
+4. 补充解析json的形式
+5. 梳理统一的错误提示

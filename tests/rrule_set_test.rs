@@ -141,8 +141,22 @@ fn test_expand_by_month() {
             "DTSTART:20231126T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO;BYDAY=-2FR;",
             vec!["20231222T091800", "20240119T091800", "20240216T091800"],
         ),
+        (
+            "DTSTART;America/New_York:20231126T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO",
+            vec!["20231222T091800", "20240119T091800", "20240216T091800"],
+        ),
     ];
     run_test_by_vec(test_vec);
+}
+
+#[test]
+fn test_set_tz_in_str(){
+    let str =  "DTSTART;America/New_York:20231126T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO";
+    let mut set = RRuleSet::from_str(str).unwrap();
+    assert_eq!(set.tz, Tz::America__New_York);
+
+    set.tz("America/Maceio");
+    assert_eq!(set.tz, Tz::America__Maceio);
 }
 
 #[test]

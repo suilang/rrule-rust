@@ -202,6 +202,17 @@ pub fn parse_dt_strart_str(s: &str) -> Result<PointTime, String> {
     let key_value: Vec<_> = s.split(":").collect();
     key_value[1].parse()
 }
+/// 获取tz和开始时间
+pub fn parse_dt_strart_str_and_tz(s: &str) -> Result<(PointTime, Option<Tz>), String> {
+    let key_value: Vec<_> = s.split([':', ';']).collect();
+    if key_value.len() == 2 {
+        let point_time: PointTime = key_value[1].parse()?;
+        return Ok((point_time, None));
+    }
+    let tz: Tz = key_value[1].parse()?;
+    let point_time: PointTime = key_value[2].parse()?;
+    return Ok((point_time, Some(tz)));
+}
 
 /// 找到从给定时间起的下一个指定的星期几的时刻
 pub fn get_start_time_by_week(time: &DateTime<Tz>, weekday: Weekday) -> DateTime<Tz> {

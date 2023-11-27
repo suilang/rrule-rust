@@ -33,6 +33,9 @@ init().then(() => {
   const set = new JsRRuleSet('DTSTART:20220506T180000Z\nRRULE:FREQ=WEEKLY;WKST=SU;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR;UNTIL=20231121T235959');
   set.tz('Asia/Shanghai')
 
+  // or with timezone in string
+  // DTSTART;Asia/Shanghai:20220506T180000Z\nRRULE:FREQ=WEEKLY;WKST=SU;UNTIL=20231121T235959
+  
   set
     .all()
     .split(',')
@@ -47,8 +50,6 @@ init().then(() => {
 "2022-05-13T10:00:00.000Z",
  /* … */]
 ```
-
-It is not supported to set the time zone directly in the string, you must use `set.tz` setting, the default is `UTC`. It will only recognization `DTSTART` if use str like `DTSTART;TZID=America/Denver:20181101T190000;`.
 
 Due to a communication problem, the format returned is a timestamp concatenated string, separated by commas. Need to actively divide and parse.
 
