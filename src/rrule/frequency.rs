@@ -29,7 +29,7 @@ impl FromStr for Frequency {
             "HOURLY" => Self::Hourly,
             "MINUTELY" => Self::Minutely,
             "SECONDLY" => Self::Secondly,
-            val => return Err(val.to_string()),
+            val => return Err(format!("invalid freq: {}", val.to_string())),
         };
         Ok(freq)
     }
