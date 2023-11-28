@@ -1,11 +1,13 @@
 [package]
 name = "rrule-rust"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2021"
 authors = ["suilang <suilangzpc@gmail.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 keywords = ["rrule", "rust", "webassembly"]
+license = "MIT"
+repository = "https://github.com/suilang/rrule-rust"
 
 [dependencies]
 wasm-bindgen = "0.2"

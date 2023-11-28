@@ -20,7 +20,7 @@
         //   'FREQ=WEEKLY;WKST=SU;UNTIL=20231103T180000Z;INTERVAL=1;BYDAY=TU'
         // );
 
-        const set = new JsRRuleSet('DTSTART;America/New_York:20231126T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO');
+        const set = new JsRRuleSet('DTSTART;TZID=America/New_York:20231126T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO');
         set.tz('Asia/Shanghai')
         console.log(
           '==>',
