@@ -209,7 +209,8 @@ pub fn parse_dt_strart_str_and_tz(s: &str) -> Result<(PointTime, Option<Tz>), St
         let point_time: PointTime = key_value[1].parse()?;
         return Ok((point_time, None));
     }
-    let tz: Tz = key_value[1].parse()?;
+    let tz_str = key_value[1].split("=").collect::<Vec<_>>();
+    let tz: Tz = tz_str[1].parse()?;
     let point_time: PointTime = key_value[2].parse()?;
     return Ok((point_time, Some(tz)));
 }

@@ -151,7 +151,7 @@ fn test_expand_by_month() {
 
 #[test]
 fn test_set_tz_in_str(){
-    let str =  "DTSTART;America/New_York:20231126T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO";
+    let str =  "DTSTART;TZID=America/New_York:20231013T003000\nRRULE:FREQ=WEEKLY;WKST=SU;INTERVAL=1;BYDAY=FR;UNTIL=20231128T105959";
     let mut set = RRuleSet::from_str(str).unwrap();
     assert_eq!(set.tz, Tz::America__New_York);
 

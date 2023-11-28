@@ -34,7 +34,7 @@ init().then(() => {
   set.tz('Asia/Shanghai')
 
   // or with timezone in string
-  // DTSTART;Asia/Shanghai:20220506T180000Z\nRRULE:FREQ=WEEKLY;WKST=SU;UNTIL=20231121T235959
+  // DTSTART;TZID=Asia/Shanghai:20220506T180000Z\nRRULE:FREQ=WEEKLY;WKST=SU;UNTIL=20231121T235959
   
   set
     .all()
