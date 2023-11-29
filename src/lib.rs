@@ -20,7 +20,7 @@ impl JsRRule {
         }
     }
 
-    pub fn set_count(&mut self, count: u32){
+    pub fn set_count(&mut self, count: u32) {
         self.rrule.count = count;
     }
 }
@@ -46,12 +46,16 @@ impl JsRRuleSet {
         self.rrule_set.tz(tz);
     }
 
-    pub fn set_dt_start(&mut self, str: &str){
+    pub fn set_dt_start(&mut self, str: &str) {
         self.rrule_set.set_dt_start(str)
     }
 
-    pub fn set_count(&mut self, count: u32){
+    pub fn set_count(&mut self, count: u32) {
         self.rrule_set.set_count(count);
+    }
+
+    pub fn set_until(&mut self, str: &str) {
+        self.rrule_set.set_until(str);
     }
 
     pub fn all(&self) -> String {

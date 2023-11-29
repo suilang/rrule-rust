@@ -191,6 +191,13 @@ impl RRule {
     pub fn set_count(&mut self, count: u32) {
         self.count = count;
     }
+
+    pub fn set_until(&mut self, str: &str) {
+        let point: Result<PointTime, String> = str.parse();
+        if point.is_ok() {
+            self.until = Some(point.unwrap())
+        }
+    }
 }
 
 pub fn get_tz_from_str(tz: &str) -> Tz {

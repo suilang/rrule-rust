@@ -7,7 +7,7 @@ use chrono_tz::Tz;
 const MAX_UNTIL_STR: &str = "23000101T000000Z";
 #[derive(Debug)]
 pub struct RRuleSet {
-    rrule: Vec<RRule>,
+    pub rrule: Vec<RRule>,
     pub tz: Tz,
     start_point_time: Option<PointTime>,
     max_until_time: PointTime,
@@ -58,6 +58,13 @@ impl RRuleSet {
             return;
         }
         self.rrule.get_mut(0).unwrap().set_count(count);
+    }
+
+    pub fn set_until(&mut self, str: &str) {
+        if self.rrule.len() == 0 {
+            return;
+        }
+        self.rrule.get_mut(0).unwrap().set_until(str);
     }
 
     pub fn all(&self) -> Vec<DateTime<Tz>> {

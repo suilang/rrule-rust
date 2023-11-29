@@ -158,6 +158,16 @@ fn test_set_tz_in_str(){
     set.tz("America/Maceio");
     assert_eq!(set.tz, Tz::America__Maceio);
 }
+#[test]
+fn test_set_until_in_str(){
+    let str =  "DTSTART;TZID=America/New_York:20231013T003000\nRRULE:FREQ=WEEKLY;WKST=SU;INTERVAL=1;BYDAY=FR;UNTIL=20231128T105959";
+    let mut set = RRuleSet::from_str(str).unwrap();
+    assert_eq!(set.tz, Tz::America__New_York);
+
+    set.set_until("20231129T105959");
+    let rrule = set.rrule.get(0).unwrap();
+    assert_eq!(rrule.until.as_ref().unwrap(), &"20231129T105959".parse::<PointTime>().unwrap());
+}
 
 #[test]
 fn test_expand_by_year() {

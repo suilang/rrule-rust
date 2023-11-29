@@ -104,9 +104,54 @@ Same as `FREQ=DAILY`.
 2. Because BYHOUR is not supported, the end time is compared by day. The logic will be modified later.
 3. Bysetpos is not supported. 
 
+## API
+
+#### RRuleSet.constructor
+
+new rruleset with str.
+
+```js
+const set = new JsRRuleSet('DTSTART;TZID=America/New_York:20231126T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO');
+```
+
+#### RRUleSet.tz
+
+set timezone. Overwrites the value in the string.
+
+```js
+set.tz('Asia/Shanghai')
+```
+
+#### RRuleSet.set_dt_start
+
+when use str like `RRULE:FREQ=MONTHLY;COUNT=3;WKST=MO`, without dt_start init rruleSet, You can call this function to set the start time. Overwrites the value in the string.
+
+```js
+set.set_dt_start("20231129T105959");
+```
+#### RRuleSet.set_until
+
+Set until separately. Overwrites the value in the string.
+
+```js
+set.set_until("20231129T105959");
+```
+
+#### RRuleSet.set_count
+
+Set count separately. Overwrites the value in the string.
+
+```js
+set.set_count(10)
+```
+#### RRuleSet.all
+
+Returns all the occurrences of the rrule between `dt_start` and `until`. if set count, The maximum length of the return list is count, regardless of whether until is reached.
+
+
 ## Test
 
-For different loops, as well as most of the various parameter combinations, I have made a comparison with rrule-js to ensure the correctness of the logic. When I'm done with most of the rules, I'll include a github address where can view specific test cases.
+For different loops, as well as most of the various parameter combinations, I have made a comparison with rrule-js to ensure the correctness of the logic. You can view specific test cases in [there](./tests/rrule_set_test.rs).
 
 
 # License
