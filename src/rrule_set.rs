@@ -382,7 +382,7 @@ impl RRuleSet {
 
             // 先缓存符合一定条件的，再过滤不符合另一部分条件的
             let mut list: Vec<NaiveDate> = vec![];
-            let curr_month_start = NaiveDate::from_ymd_opt(curr.year(), 1, 1).unwrap();
+            let curr_month_start = NaiveDate::from_ymd_opt(curr.year(), curr.month(), 1).unwrap();
             let curr_month_end = Self::get_last_day_of_month(curr.year(), curr.month());
 
             let valid_start = if curr_month_start > naive_dt_start {
@@ -391,9 +391,9 @@ impl RRuleSet {
                 &naive_dt_start
             };
             let valid_end = if curr_month_end > naive_end_time {
-                &curr_month_end
-            } else {
                 &naive_end_time
+            } else {
+                &curr_month_end
             };
 
             // 如果指定了yearday但是无结果，则直接返回，如果有，push到list里
@@ -1042,7 +1042,7 @@ impl RRuleSet {
 
     /// 获取指定月份所有指定的星期
     fn get_all_weekday_of_month(year: i32, month: u32, weekday: &Weekday) -> Vec<NaiveDate> {
-        (1..5)
+        (1..6)
             .map(|n| NaiveDate::from_weekday_of_month_opt(year, month, *weekday, n))
             .filter(|n| n.is_some())
             .map(|n| n.unwrap())
