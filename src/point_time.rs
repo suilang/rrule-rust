@@ -144,6 +144,19 @@ impl PointTime {
             _ => false,
         }
     }
+
+    pub fn get_max_time<'a>(p1: &'a PointTime, p2: &'a PointTime) -> &'a PointTime {
+        if p1 > p2 {
+            return p1;
+        }
+        return p2;
+    }
+    pub fn get_min_time<'a>(p1: &'a PointTime, p2: &'a PointTime) -> &'a PointTime {
+        if p1 > p2 {
+            return p2;
+        }
+        return p1;
+    }
 }
 
 #[cfg(test)]

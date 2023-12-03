@@ -1,6 +1,6 @@
 [package]
 name = "rrule-rust"
-version = "0.0.6"
+version = "0.0.7"
 edition = "2021"
 authors = ["suilang <suilangzpc@gmail.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

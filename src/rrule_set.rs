@@ -1,16 +1,19 @@
+use crate::constant;
 use crate::point_time::PointTime;
 use crate::rrule::weekday::NWeekday;
 use crate::rrule::{get_tz_from_str, parse_dt_strart_str_and_tz, RRule};
 use chrono::{DateTime, Datelike, Duration, Months, NaiveDate, Weekday};
 use chrono_tz::Tz;
 
-const MAX_UNTIL_STR: &str = "23000101T000000Z";
+
 #[derive(Debug)]
 pub struct RRuleSet {
     pub rrule: Vec<RRule>,
     pub tz: Tz,
     start_point_time: Option<PointTime>,
     max_until_time: PointTime,
+    between_start: Option<PointTime>,
+    between_end: Option<PointTime>,
 }
 
 impl RRuleSet {
@@ -35,7 +38,9 @@ impl RRuleSet {
             rrule: vec![rrule],
             tz,
             start_point_time: start_point_time,
-            max_until_time: MAX_UNTIL_STR.parse::<PointTime>().unwrap(),
+            max_until_time: constant::MAX_UNTIL_STR.parse::<PointTime>().unwrap(),
+            between_start: None,
+            between_end: None,
         })
     }
     pub fn add_rrule(&mut self, rrule: &str) {
@@ -67,6 +72,19 @@ impl RRuleSet {
         self.rrule.get_mut(0).unwrap().set_until(str);
     }
 
+    /// set between range, used when return the list in all func
+    /// filter list which >= between_start and <= between_end
+    pub fn between(&mut self, start: &str, end: &str) {
+        let between_start: Result<PointTime, _> = start.parse();
+        let between_end: Result<PointTime, _> = end.parse();
+        if between_start.is_ok() {
+            self.between_start = Some(between_start.unwrap());
+        }
+        if between_end.is_ok() {
+            self.between_end = Some(between_end.unwrap());
+        }
+    }
+
     pub fn all(&self) -> Vec<DateTime<Tz>> {
         if self.start_point_time.is_none() {
             return Vec::new();
@@ -95,35 +113,33 @@ impl RRuleSet {
 
         // todo 提前排除下week_no与by_month\by_year_day的交集是否有效
 
-        match rrule.freq {
-            crate::rrule::Frequency::Yearly => self
-                .expand_by_year()
-                .unwrap()
-                .into_iter()
-                .map(|p| p.with_timezone(&self.tz))
-                .collect(),
-            crate::rrule::Frequency::Monthly => self
-                .expand_by_month()
-                .unwrap()
-                .into_iter()
-                .map(|p| p.with_timezone(&self.tz))
-                .collect(),
-            crate::rrule::Frequency::Weekly => self
-                .expand_by_week()
-                .unwrap()
-                .into_iter()
-                .map(|p| p.with_timezone(&self.tz))
-                .collect(),
-            crate::rrule::Frequency::Daily => self
-                .expand_by_day()
-                .unwrap()
-                .into_iter()
-                .map(|p| p.with_timezone(&self.tz))
-                .collect(),
+        let list: Vec<PointTime> = match rrule.freq {
+            crate::rrule::Frequency::Yearly => self.expand_by_year().unwrap(),
+            crate::rrule::Frequency::Monthly => self.expand_by_month().unwrap(),
+            crate::rrule::Frequency::Weekly => self.expand_by_week().unwrap(),
+            crate::rrule::Frequency::Daily => self.expand_by_day().unwrap(),
             crate::rrule::Frequency::Hourly => todo!(),
             crate::rrule::Frequency::Minutely => todo!(),
             crate::rrule::Frequency::Secondly => todo!(),
-        }
+        };
+
+        list.into_iter()
+            .filter(|n| {
+                if self.between_start.is_none() {
+                    true
+                } else {
+                    n >= &self.between_start.as_ref().unwrap()
+                }
+            })
+            .filter(|n| {
+                if self.between_end.is_none() {
+                    true
+                } else {
+                    n <= &self.between_end.as_ref().unwrap()
+                }
+            })
+            .map(|p| p.with_timezone(&self.tz))
+            .collect()
     }
 
     /// 按天扩展，无效则报错

@@ -144,6 +144,15 @@ Set count separately. Overwrites the value in the string.
 ```js
 set.set_count(10)
 ```
+
+#### RRuleSet.between
+
+Used to filter the list returned by the all function. This is useful if a lot of data is returned. Filter results will include the start and end of the day. You have to deal with scenarios that return empty.
+
+```js
+set.between("20231106T091800Z", "20231130T091859Z");
+```
+
 #### RRuleSet.all
 
 Returns all the occurrences of the rrule between `dt_start` and `until`. if set count, The maximum length of the return list is count, regardless of whether until is reached.

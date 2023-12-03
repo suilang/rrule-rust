@@ -1,7 +1,7 @@
 pub mod point_time;
 pub mod rrule;
 pub mod rrule_set;
-
+mod constant;
 use rrule::RRule;
 use rrule_set::RRuleSet;
 
@@ -56,6 +56,10 @@ impl JsRRuleSet {
 
     pub fn set_until(&mut self, str: &str) {
         self.rrule_set.set_until(str);
+    }
+
+    pub fn between(&mut self, start: &str, end:&str){
+        self.rrule_set.between(start, end);
     }
 
     pub fn all(&self) -> String {

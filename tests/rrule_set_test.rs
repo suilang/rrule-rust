@@ -150,7 +150,7 @@ fn test_expand_by_month() {
 }
 
 #[test]
-fn test_set_tz_in_str(){
+fn test_set_tz_in_str() {
     let str =  "DTSTART;TZID=America/New_York:20231013T003000\nRRULE:FREQ=WEEKLY;WKST=SU;INTERVAL=1;BYDAY=FR;UNTIL=20231128T105959";
     let mut set = RRuleSet::from_str(str).unwrap();
     assert_eq!(set.tz, Tz::America__New_York);
@@ -159,14 +159,38 @@ fn test_set_tz_in_str(){
     assert_eq!(set.tz, Tz::America__Maceio);
 }
 #[test]
-fn test_set_until_in_str(){
+fn test_set_until_in_str() {
     let str =  "DTSTART;TZID=America/New_York:20231013T003000\nRRULE:FREQ=WEEKLY;WKST=SU;INTERVAL=1;BYDAY=FR;UNTIL=20231128T105959";
     let mut set = RRuleSet::from_str(str).unwrap();
     assert_eq!(set.tz, Tz::America__New_York);
 
     set.set_until("20231129T105959");
     let rrule = set.rrule.get(0).unwrap();
-    assert_eq!(rrule.until.as_ref().unwrap(), &"20231129T105959".parse::<PointTime>().unwrap());
+    assert_eq!(
+        rrule.until.as_ref().unwrap(),
+        &"20231129T105959".parse::<PointTime>().unwrap()
+    );
+}
+#[test]
+fn test_set_between() {
+    let str =  "DTSTART;TZID=America/New_York:20231013T091800\nRRULE:FREQ=WEEKLY;WKST=SU;INTERVAL=1;BYDAY=FR;UNTIL=20231128T105959";
+    let mut set = RRuleSet::from_str(str).unwrap();
+
+    set.set_until("20231129T105959");
+    set.between("20231101T000000", "20231120T000000");
+    let list: Vec<chrono::prelude::DateTime<Tz>> = set.all();
+    assert_eq!(
+        list,
+        vec!["20231103T091800", "20231110T091800", "20231117T091800"]
+            .iter()
+            .map(|time| time
+                .parse::<PointTime>()
+                .unwrap()
+                .with_timezone(&Tz::America__New_York))
+            .collect::<Vec<_>>()
+    );
+    set.between("20231129T000000", "20231220T000000");
+    assert!(set.all().is_empty());
 }
 
 #[test]
