@@ -12,29 +12,51 @@
   </head>
   <body>
     <script type="module">
-      import init, { JsRRule, JsRRuleSet } from "./pkg/rrule_rust.js";
-      console.time("start");
+      import init, {
+        JsRRule,
+        JsRRuleSet,
+        getJsRRuleSet,
+      } from './pkg/rrule_rust.js';
+      console.time('start');
       init().then(() => {
-        console.time("time");
+        console.time('time');
         // const rrule = new JsRRule(
         //   'FREQ=WEEKLY;WKST=SU;UNTIL=20231103T180000Z;INTERVAL=1;BYDAY=TU'
         // );
 
         const set = new JsRRuleSet(
-          "DTSTART;TZID=America/New_York:20221126T091800Z\nRRULE:FREQ=MONTHLY;UNTIL=20231126T091800Z;WKST=MO"
+          'DTSTART;TZID=America/New_York:20221126T091800Z\nRRULE:FREQ=MONTHLY;UNTIL=20231126T091800Z;WKST=MO;COUNT=3;INTERVAL=2'
         );
-        set.tz("Asia/Shanghai");
-        set.between("20231106T091800Z", "20231130T091859Z");
+        // set.tz('Asia/Shanghai');
+        // set.between('20231106T091800Z', '20231130T091859Z');
 
         console.log(
-          "==>",
+          '==>',
           set
             .all()
-            .split(",")
+            .split(',')
             .map((str) => new Date(Number(str)).toISOString())
         );
-        console.timeEnd("time");
-        console.timeEnd("start");
+        console.timeEnd('time');
+        console.timeEnd('start');
+
+        const data = {
+          dtStart: '20221126T091800Z',
+          count: 3,
+          freq: 'MONTHLY',
+          interval: 2,
+          until: '20231126T091800Z',
+          wkst: 'MO',
+          tz: 'America/New_York',
+        };
+        const set2 = getJsRRuleSet(JSON.stringify(data));
+        console.log(
+          '==>',
+          set2
+            .all()
+            .split(',')
+            .map((str) => new Date(Number(str)).toISOString())
+        );
       });
     </script>
   </body>

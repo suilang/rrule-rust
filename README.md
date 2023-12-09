@@ -1,6 +1,6 @@
 # @suilang/rrule
 
-**Build with rust, 5 faster than rrule.js**  
+**Build with rust, 5 faster than rrule.js**
 
 This is a rrule project written in Rust, which is ultimately packaged as WebAssembly for use. The current version of this project does not strictly adhere to the iCalendar RFC. For example, certain properties may not take effect when the recurring dimension is monthly, weekly, or daily. Additionally, the project has not yet implemented `BYHOURLY`、`BYMINUTELY` and `BYSECONDLY`.
 
@@ -26,7 +26,9 @@ Server-side calls are not currently supported, although the packaging is differe
 
 In es module, you must call the `init` function before you can use the inner function. Don't worry about performance, it may only take a few tens of milliseconds.
 
-```es6
+#### Init by string
+
+```javascript
 import init, { JsRRuleSet } from '@suilang/rrule';
 
 init().then(() => {
@@ -35,7 +37,7 @@ init().then(() => {
 
   // or with timezone in string
   // DTSTART;TZID=Asia/Shanghai:20220506T180000Z\nRRULE:FREQ=WEEKLY;WKST=SU;UNTIL=20231121T235959
-  
+
   set
     .all()
     .split(',')
@@ -56,10 +58,64 @@ Due to a communication problem, the format returned is a timestamp concatenated 
 You can also set start time separately in the following way:
 
 ```js
-const set = new JsRRuleSet('RRULE:FREQ=WEEKLY;WKST=SU;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR;UNTIL=20231121T235959');
+const set = new JsRRuleSet(
+  'RRULE:FREQ=WEEKLY;WKST=SU;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR;UNTIL=20231121T235959'
+);
 
-set.tz('Asia/Shanghai')
-set.set_dt_start("20220506T180000Z")
+set.tz('Asia/Shanghai');
+set.set_dt_start('20220506T180000Z');
+```
+
+#### Init by json
+
+Rust does not recognize js objects directly, so the data needs to be passed in JSON form.
+
+```javascript
+import init, { getJsRRuleSet } from './pkg/rrule_rust.js';
+
+const data = {
+  dtStart: '20221126T091800Z',
+  count: 3,
+  freq: 'MONTHLY',
+  interval: 2,
+  until: '20231126T091800Z',
+  wkst: 'MO',
+  tz: 'America/New_York',
+};
+init().then(() => {
+  const set = getJsRRuleSet(JSON.stringify(data));
+  set
+    .all()
+    .split(',')
+    .map((str) => new Date(Number(str)))
+})
+
+[ "2022-05-06T10:00:00.000Z",
+"2022-05-09T10:00:00.000Z",
+"2022-05-10T10:00:00.000Z",
+"2022-05-11T10:00:00.000Z",
+"2022-05-12T10:00:00.000Z",
+"2022-05-13T10:00:00.000Z",
+ /* … */]
+```
+
+The types of currently recognizable parameters are as follows
+
+```javascript
+interface RRuleProps {
+  dtStart: string; // '20231101T120000Z'
+  count: number; // 3
+  freq: string; // 'DAILY'
+  interval: number; // 2
+  byWeekNo: number[]; // [1, 2]
+  byDay: string[]; // ['MO', '-1FR']
+  until: string; // '20231201T120000Z'
+  wkst: string; // 'SU';
+  byMonthDay: number[]; // [-1, 2]
+  byMonth: number[]; // [2, 3]
+  byYearDay: number[]; // [1, 50]
+  tz: string; // 'America/New_York'
+}
 ```
 
 ## Property Support
@@ -102,7 +158,7 @@ Same as `FREQ=DAILY`.
 
 1. The default and maximum cut-off time is set to 2300 years and cannot be changed at this time.
 2. Because BYHOUR is not supported, the end time is compared by day. The logic will be modified later.
-3. Bysetpos is not supported. 
+3. Bysetpos is not supported.
 
 ## API
 
@@ -111,7 +167,9 @@ Same as `FREQ=DAILY`.
 new rruleset with str.
 
 ```js
-const set = new JsRRuleSet('DTSTART;TZID=America/New_York:20231126T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO');
+const set = new JsRRuleSet(
+  'DTSTART;TZID=America/New_York:20231126T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO'
+);
 ```
 
 #### RRUleSet.tz
@@ -119,7 +177,7 @@ const set = new JsRRuleSet('DTSTART;TZID=America/New_York:20231126T091800Z\nRRUL
 set timezone. Overwrites the value in the string.
 
 ```js
-set.tz('Asia/Shanghai')
+set.tz('Asia/Shanghai');
 ```
 
 #### RRuleSet.set_dt_start
@@ -127,14 +185,15 @@ set.tz('Asia/Shanghai')
 when use str like `RRULE:FREQ=MONTHLY;COUNT=3;WKST=MO`, without dt_start init rruleSet, You can call this function to set the start time. Overwrites the value in the string.
 
 ```js
-set.set_dt_start("20231129T105959");
+set.set_dt_start('20231129T105959');
 ```
+
 #### RRuleSet.set_until
 
 Set until separately. Overwrites the value in the string.
 
 ```js
-set.set_until("20231129T105959");
+set.set_until('20231129T105959');
 ```
 
 #### RRuleSet.set_count
@@ -142,7 +201,7 @@ set.set_until("20231129T105959");
 Set count separately. Overwrites the value in the string.
 
 ```js
-set.set_count(10)
+set.set_count(10);
 ```
 
 #### RRuleSet.between
@@ -150,18 +209,16 @@ set.set_count(10)
 Used to filter the list returned by the all function. This is useful if a lot of data is returned. Filter results will include the start and end of the day. You have to deal with scenarios that return empty.
 
 ```js
-set.between("20231106T091800Z", "20231130T091859Z");
+set.between('20231106T091800Z', '20231130T091859Z');
 ```
 
 #### RRuleSet.all
 
 Returns all the occurrences of the rrule between `dt_start` and `until`. if set count, The maximum length of the return list is count, regardless of whether until is reached.
 
-
 ## Test
 
 For different loops, as well as most of the various parameter combinations, I have made a comparison with rrule-js to ensure the correctness of the logic. You can view specific test cases in [there](./tests/rrule_set_test.rs).
-
 
 # License
 

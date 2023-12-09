@@ -159,6 +159,17 @@ impl PointTime {
     }
 }
 
+use std::fmt;
+impl fmt::Display for PointTime {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}{:02}{:02}T{:02}{:02}{:02}Z",
+            self.year, self.month, self.day, self.hour, self.min, self.sec
+        )
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::PointTime;
@@ -227,6 +238,14 @@ mod test {
             "20231029T191020".parse::<PointTime>().unwrap()
                 < "23000101T000000".parse::<PointTime>().unwrap(),
             true
+        );
+    }
+
+    #[test]
+    fn test_to_str() {
+        assert_eq!(
+            "20231029T191020".parse::<PointTime>().unwrap().to_string(),
+            "20231029T191020Z"
         );
     }
 }

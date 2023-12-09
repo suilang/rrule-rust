@@ -1,11 +1,11 @@
+mod constant;
 pub mod point_time;
 pub mod rrule;
 pub mod rrule_set;
-mod constant;
 use rrule::RRule;
 use rrule_set::RRuleSet;
-
 use wasm_bindgen::prelude::*;
+
 #[wasm_bindgen]
 pub struct JsRRule {
     rrule: RRule,
@@ -37,7 +37,6 @@ impl JsRRuleSet {
             rrule_set: RRuleSet::from_str(s).unwrap(),
         }
     }
-    #[wasm_bindgen]
     pub fn add_rrule(&mut self, rrule: &str) {
         self.rrule_set.add_rrule(rrule)
     }
@@ -58,7 +57,7 @@ impl JsRRuleSet {
         self.rrule_set.set_until(str);
     }
 
-    pub fn between(&mut self, start: &str, end:&str){
+    pub fn between(&mut self, start: &str, end: &str) {
         self.rrule_set.between(start, end);
     }
 
@@ -70,4 +69,10 @@ impl JsRRuleSet {
             .collect::<Vec<_>>()
             .join(",")
     }
+}
+
+#[wasm_bindgen(js_name="getJsRRuleSet")]
+pub fn get_js_rrule_set(json_str: &str) -> JsRRuleSet {
+    let rrule_set = RRuleSet::from_json(json_str);
+    JsRRuleSet { rrule_set }
 }

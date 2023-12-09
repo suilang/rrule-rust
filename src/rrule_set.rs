@@ -4,16 +4,16 @@ use crate::rrule::weekday::NWeekday;
 use crate::rrule::{get_tz_from_str, parse_dt_strart_str_and_tz, RRule};
 use chrono::{DateTime, Datelike, Duration, Months, NaiveDate, Weekday};
 use chrono_tz::Tz;
-
+use serde_json::Value;
 
 #[derive(Debug)]
 pub struct RRuleSet {
     pub rrule: Vec<RRule>,
     pub tz: Tz,
-    start_point_time: Option<PointTime>,
-    max_until_time: PointTime,
-    between_start: Option<PointTime>,
-    between_end: Option<PointTime>,
+    pub start_point_time: Option<PointTime>,
+    pub max_until_time: PointTime,
+    pub between_start: Option<PointTime>,
+    pub between_end: Option<PointTime>,
 }
 
 impl RRuleSet {
@@ -1210,10 +1210,110 @@ impl RRuleSet {
         }
         return Self::is_date_in_range(start, end, &curr.unwrap());
     }
+
+    pub fn from_json(json_str: &str) -> RRuleSet {
+        let parsed: Value = serde_json::from_str(json_str).expect("Failed to parse JSON");
+        let dt_start = parsed["dtStart"].as_str();
+        let tz = parsed["tz"].as_str();
+        let freq = parsed["freq"].as_str().unwrap_or("WEEKLY");
+        let count = parsed["count"].as_u64();
+        let until = parsed["until"].as_str();
+        let by_day = parsed["byDay"].as_array();
+        let interval = parsed["interval"].as_u64();
+        let week_start = parsed["wkst"].as_str();
+        let by_month_day = parsed["byMonthDay"].as_array();
+        let by_month = parsed["byMonth"].as_array();
+        let by_year_day = parsed["byYearDay"].as_array();
+        let by_week_no = parsed["byWeekNo"].as_array();
+
+        let mut rrule_str = String::from("");
+
+        if dt_start.is_some() {
+            rrule_str += "DTSTART";
+            if tz.is_some() {
+                rrule_str += &format!(";TZID={}:{}\n", tz.unwrap(), dt_start.unwrap());
+            } else {
+                rrule_str += &format!(":{}\n", dt_start.unwrap());
+            }
+        }
+        rrule_str += &format!("RRULE:FREQ={};", freq);
+
+        if count.is_some() {
+            rrule_str += &format!("COUNT={};", count.unwrap());
+        }
+        if until.is_some() {
+            rrule_str += &format!("UNTIL={};", until.unwrap());
+        }
+        if interval.is_some() {
+            rrule_str += &format!("INTERVAL={};", interval.unwrap());
+        }
+        if week_start.is_some() {
+            rrule_str += &format!("WKST={};", week_start.unwrap());
+        }
+        if by_day.is_some() {
+            rrule_str += &format!(
+                "BYDAY={};",
+                by_day
+                    .unwrap()
+                    .iter()
+                    .map(|n| n.as_str().unwrap())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+        }
+        if by_month_day.is_some() {
+            rrule_str += &format!(
+                "BYMONTHDAY={};",
+                by_month_day
+                    .unwrap()
+                    .iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+        }
+        if by_month.is_some() {
+            rrule_str += &format!(
+                "BYMONTH={};",
+                by_month
+                    .unwrap()
+                    .iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+        }
+        if by_year_day.is_some() {
+            rrule_str += &format!(
+                "BYYEARDAY={};",
+                by_year_day
+                    .unwrap()
+                    .iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+        }
+        if by_week_no.is_some() {
+            rrule_str += &format!(
+                "BYWEEKNO={};",
+                by_week_no
+                    .unwrap()
+                    .iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+        }
+
+        RRuleSet::from_str(&rrule_str).unwrap()
+    }
 }
 
 #[cfg(test)]
 mod test {
+    use crate::rrule::Frequency;
+
     use super::*;
 
     #[test]
@@ -1346,5 +1446,50 @@ mod test {
         assert_eq!(dates.get(0).unwrap().to_string(), "2022-05-06 18:00:00 UTC");
         assert_eq!(dates.get(1).unwrap().to_string(), "2022-05-09 18:00:00 UTC");
         assert_eq!(dates.last().unwrap().to_string(), "2023-11-21 18:00:00 UTC");
+    }
+
+    #[test]
+    fn test_from_json() {
+        let json_str = r#"
+        {
+            "dtStart": "20231101T120000Z",
+            "count": 3,
+            "freq": "DAILY",
+            "interval": 2,
+            "byDay": ["MO", "-1FR"],
+            "until": "20231201T120000Z",
+            "wkst": "SU",
+            "byMonthDay": [-1, 2],
+            "byMonth": [2, 3],
+            "byWeekNo": [1,-1],
+            "byYearDay": [1, 50],
+            "tz": "America/New_York"
+        }
+        "#;
+        let rrule_set = RRuleSet::from_json(json_str);
+        assert_eq!(
+            rrule_set.start_point_time.unwrap().to_string(),
+            "20231101T120000Z"
+        );
+        assert_eq!(rrule_set.rrule[0].count, 3);
+        assert_eq!(rrule_set.rrule[0].freq, Frequency::Daily);
+        assert_eq!(rrule_set.rrule[0].interval, 2);
+        assert_eq!(
+            rrule_set.rrule[0].by_day,
+            vec![
+                NWeekday::Every(Weekday::Mon),
+                NWeekday::Nth(-1, Weekday::Fri)
+            ]
+        );
+        assert_eq!(
+            rrule_set.rrule[0].until.as_ref().unwrap().to_string(),
+            "20231201T120000Z"
+        );
+        assert_eq!(rrule_set.rrule[0].week_start, Weekday::Sun);
+        assert_eq!(rrule_set.rrule[0].by_month_day, vec![-1, 2]);
+        assert_eq!(rrule_set.rrule[0].by_month, vec![2, 3]);
+        assert_eq!(rrule_set.rrule[0].by_week_no, vec![1, -1]);
+        assert_eq!(rrule_set.rrule[0].by_year_day, vec![1, 50]);
+        assert_eq!(rrule_set.tz, Tz::America__New_York);
     }
 }
