@@ -53,9 +53,7 @@
         console.log(
           '==>',
           set2
-            .all()
-            .split(',')
-            .map((str) => new Date(Number(str)).toISOString())
+            .valueOf()
         );
       });
     </script>

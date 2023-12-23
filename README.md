@@ -59,11 +59,11 @@ You can also set start time separately in the following way:
 
 ```js
 const set = new JsRRuleSet(
-  'RRULE:FREQ=WEEKLY;WKST=SU;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR;UNTIL=20231121T235959'
+  "RRULE:FREQ=WEEKLY;WKST=SU;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR;UNTIL=20231121T235959"
 );
 
-set.tz('Asia/Shanghai');
-set.set_dt_start('20220506T180000Z');
+set.tz("Asia/Shanghai");
+set.set_dt_start("20220506T180000Z");
 ```
 
 #### Init by json
@@ -168,7 +168,7 @@ new rruleset with str.
 
 ```js
 const set = new JsRRuleSet(
-  'DTSTART;TZID=America/New_York:20231126T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO'
+  "DTSTART;TZID=America/New_York:20231126T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;WKST=MO"
 );
 ```
 
@@ -177,7 +177,7 @@ const set = new JsRRuleSet(
 set timezone. Overwrites the value in the string.
 
 ```js
-set.tz('Asia/Shanghai');
+set.tz("Asia/Shanghai");
 ```
 
 #### RRuleSet.set_dt_start
@@ -185,7 +185,7 @@ set.tz('Asia/Shanghai');
 when use str like `RRULE:FREQ=MONTHLY;COUNT=3;WKST=MO`, without dt_start init rruleSet, You can call this function to set the start time. Overwrites the value in the string.
 
 ```js
-set.set_dt_start('20231129T105959');
+set.set_dt_start("20231129T105959");
 ```
 
 #### RRuleSet.set_until
@@ -193,7 +193,7 @@ set.set_dt_start('20231129T105959');
 Set until separately. Overwrites the value in the string.
 
 ```js
-set.set_until('20231129T105959');
+set.set_until("20231129T105959");
 ```
 
 #### RRuleSet.set_count
@@ -209,12 +209,32 @@ set.set_count(10);
 Used to filter the list returned by the all function. This is useful if a lot of data is returned. Filter results will include the start and end of the day. You have to deal with scenarios that return empty.
 
 ```js
-set.between('20231106T091800Z', '20231130T091859Z');
+set.between("20231106T091800Z", "20231130T091859Z");
 ```
 
 #### RRuleSet.all
 
 Returns all the occurrences of the rrule between `dt_start` and `until`. if set count, The maximum length of the return list is count, regardless of whether until is reached.
+
+#### RRuleSet.valueOf
+
+Return rrule string.
+
+```js
+const data = {
+  dtStart: "20221126T091800Z",
+  count: 3,
+  freq: "MONTHLY",
+  interval: 2,
+  until: "20231126T091800Z",
+  wkst: "MO",
+  tz: "America/New_York",
+};
+const set = getJsRRuleSet(JSON.stringify(data));
+console.log(set2.valueOf());
+
+// DTSTART;TZID=America/New_York:20221126T091800Z\nRRULE:FREQ=MONTHLY;COUNT=3;UNTIL=20231126T091800Z;INTERVAL=2;WKST=MO
+```
 
 ## Test
 

@@ -1,8 +1,9 @@
 [package]
 name = "rrule-rust"
-version = "0.0.8"
+version = "0.0.9"
 edition = "2021"
 authors = ["suilang <suilangzpc@gmail.com>"]
+description = "The rrule parser written in rrust, specially adapted for js"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 keywords = ["rrule", "rust", "webassembly"]
