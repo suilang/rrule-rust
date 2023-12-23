@@ -1308,6 +1308,99 @@ impl RRuleSet {
 
         RRuleSet::from_str(&rrule_str).unwrap()
     }
+
+    pub fn to_string(&self) -> String {
+        let mut str = "".to_string();
+        if self.rrule.is_empty() {
+            return str;
+        }
+        let rrule = &self.rrule[0];
+        if let Some(time) = &self.start_point_time {
+            let start = if self.tz == Tz::UTC {
+                format!("DTSTART:{}\n", time.to_string())
+            } else {
+                format!(
+                    "DTSTART;TZID={}:{}\n",
+                    self.tz.to_string(),
+                    time.to_string()
+                )
+            };
+            str += &start;
+        }
+        str += "RRULE:";
+
+        str += &format!("FREQ={};", rrule.freq.to_string());
+        if rrule.count != 0 {
+            str += &format!("COUNT={};", rrule.count.to_string())
+        }
+        if let Some(until) = &rrule.until {
+            str += &format!("UNTIL={};", until.to_string())
+        }
+        if rrule.interval != 1 {
+            str += &format!("INTERVAL={};", rrule.interval.to_string())
+        }
+        if !rrule.by_day.is_empty() {
+            str += &format!(
+                "BYDAY={};",
+                rrule
+                    .by_day
+                    .iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )
+        }
+
+        str += &format!("WKST={};", NWeekday::weekday_to_str(&rrule.week_start));
+        if !rrule.by_week_no.is_empty() {
+            str += &format!(
+                "BYWEEKNO={};",
+                rrule
+                    .by_week_no
+                    .iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+        }
+        if !rrule.by_month_day.is_empty() {
+            str += &format!(
+                "BYMONTHDAY={};",
+                rrule
+                    .by_month_day
+                    .iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+        }
+        if !rrule.by_month.is_empty() {
+            str += &format!(
+                "BYMONTH={};",
+                rrule
+                    .by_month
+                    .iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+        }
+        if !rrule.by_year_day.is_empty() {
+            str += &format!(
+                "BYYEARDAY={};",
+                rrule
+                    .by_year_day
+                    .iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+        }
+        if let Some((i, char)) = str.char_indices().rev().next() {
+            str.remove(i);
+        }
+        str
+    }
 }
 
 #[cfg(test)]
@@ -1491,5 +1584,12 @@ mod test {
         assert_eq!(rrule_set.rrule[0].by_week_no, vec![1, -1]);
         assert_eq!(rrule_set.rrule[0].by_year_day, vec![1, 50]);
         assert_eq!(rrule_set.tz, Tz::America__New_York);
+    }
+
+    #[test]
+    fn test_to_string() {
+        assert_eq!(
+            RRuleSet::from_str("DTSTART:20231123T091800Z\nRRULE:FREQ=YEARLY;COUNT=30;WKST=MO;BYWEEKNO=3;UNTIL=20260112T091700;INTERVAL=3;BYDAY=SU,-1FR,2WE;BYMONTHDAY=1,2,3;BYMONTH=2,4;BYYEARDAY=1,-1").unwrap().to_string(), 
+            "DTSTART:20231123T091800Z\nRRULE:FREQ=YEARLY;COUNT=30;UNTIL=20260112T091700Z;INTERVAL=3;BYDAY=SU,-1FR,2WE;WKST=MO;BYWEEKNO=3;BYMONTHDAY=1,2,3;BYMONTH=2,4;BYYEARDAY=1,-1");
     }
 }

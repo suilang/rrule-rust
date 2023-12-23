@@ -1,5 +1,8 @@
 use chrono::Weekday;
+use core::fmt;
 use std::str::FromStr;
+
+use crate::rrule::weekday;
 
 #[derive(Debug, PartialEq)]
 pub enum NWeekday {
@@ -40,7 +43,7 @@ impl NWeekday {
         }
     }
 
-    pub fn weekday_to_str(d: Weekday) -> String {
+    pub fn weekday_to_str(d: &Weekday) -> String {
         match d {
             Weekday::Mon => "MO".to_string(),
             Weekday::Tue => "TU".to_string(),
@@ -87,6 +90,19 @@ impl FromStr for NWeekday {
         } else {
             Ok(Self::new(Some(nth), wd))
         }
+    }
+}
+
+impl fmt::Display for NWeekday {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                NWeekday::Every(weekday) => NWeekday::weekday_to_str(weekday),
+                NWeekday::Nth(n, weekday) => format!("{}{}", n.to_string(), NWeekday::weekday_to_str(weekday)),
+            }
+        )
     }
 }
 

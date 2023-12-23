@@ -69,6 +69,10 @@ impl JsRRuleSet {
             .collect::<Vec<_>>()
             .join(",")
     }
+    #[wasm_bindgen(js_name="valueOf")]
+    pub fn value_of(&self)-> String {
+        self.rrule_set.to_string()
+    }
 }
 
 #[wasm_bindgen(js_name="getJsRRuleSet")]

@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{fmt::Display, str::FromStr};
 
 #[derive(PartialEq, Debug)]
 pub enum Frequency {
@@ -32,5 +32,20 @@ impl FromStr for Frequency {
             val => return Err(format!("invalid freq: {}", val.to_string())),
         };
         Ok(freq)
+    }
+}
+
+impl Display for Frequency {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let freq = match self {
+            Self::Yearly => "YEARLY",
+            Self::Monthly => "MONTHLY",
+            Self::Weekly => "WEEKLY",
+            Self::Daily => "DAILY",
+            Self::Hourly => "HOURLY",
+            Self::Minutely => "MINUTELY",
+            Self::Secondly => "SECONDLY",
+        };
+        write!(f, "{}", freq)
     }
 }
